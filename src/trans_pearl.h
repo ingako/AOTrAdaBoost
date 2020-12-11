@@ -1,7 +1,10 @@
-#ifndef __trans_pearl_H__
-#define __trans_pearl_H__
+#ifndef __TRANS_PEARL_H__
+#define __TRANS_PEARL_H__
 
 #include "PEARL/src/cpp/pearl.h"
+// #include "knn-cpp/include/knn/kdtree_minkowski.h"
+
+class trans_pearl_tree;
 
 class trans_pearl : public pearl {
 
@@ -65,6 +68,20 @@ class trans_pearl : public pearl {
                                       shared_ptr<arf_tree>& tree2);
         // virtual void predict_with_state_adaption(vector<int>& votes, int actual_label);
         bool detect_stability(int error_count, unique_ptr<HT::ADWIN>& detector);
+};
+
+class trans_pearl_tree : public pearl_tree {
+public:
+    trans_pearl_tree(int tree_pool_id,
+                     int kappa_window_size,
+                     int pro_drift_window_size,
+                     double warning_delta,
+                     double drift_delta,
+                     double hybrid_delta,
+                     std::mt19937 mrand);
+
+    int stream_start_idx;
+    int stream_end_idx;
 };
 
 #endif

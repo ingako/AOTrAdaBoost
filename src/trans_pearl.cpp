@@ -44,24 +44,28 @@ trans_pearl::trans_pearl(int num_trees,
 }
 
 void trans_pearl::init() {
-    tree_pool = vector<shared_ptr<pearl_tree>>(num_trees);
+    vector<shared_ptr<trans_pearl_tree>> temp_tree_pool = vector<shared_ptr<trans_pearl_tree>>(num_trees);
     stability_detectors = vector<unique_ptr<HT::ADWIN>>();
 
     for (int i = 0; i < num_trees; i++) {
-        tree_pool[i] = make_pearl_tree(i);
-        foreground_trees.push_back(tree_pool[i]);
+        temp_tree_pool[i] = static_pointer_cast<trans_pearl_tree>( make_pearl_tree(i));
+        foreground_trees.push_back(temp_tree_pool[i]);
         stability_detectors.push_back(make_unique<HT::ADWIN>(warning_delta));
+    }
+
+    for (auto t : temp_tree_pool) {
+        tree_pool.push_back(t);
     }
 }
 
 shared_ptr<pearl_tree> trans_pearl::make_pearl_tree(int tree_pool_id) {
-    return make_shared<pearl_tree>(tree_pool_id,
-                                   kappa_window_size,
-                                   pro_drift_window_size,
-                                   warning_delta,
-                                   drift_delta,
-                                   hybrid_delta,
-                                   mrand);
+    return make_shared<trans_pearl_tree>(tree_pool_id,
+                                         kappa_window_size,
+                                         pro_drift_window_size,
+                                         warning_delta,
+                                         drift_delta,
+                                         hybrid_delta,
+                                         mrand);
 }
 
 // foreground trees make predictions, update votes, keep track of actual labbels
@@ -342,62 +346,6 @@ vector<int> trans_pearl::adapt_state_with_proactivity(
     return actual_drifted_tree_indices;
 }
 
-// int trans_pearl::find_last_actual_drift_point(int tree_idx) {
-//     if (backtrack_instances.size() > num_max_backtrack_instances) {
-//         LOG("backtrack_instances has too many data instance");
-//         exit(1);
-//     }
-//
-//     shared_ptr<pearl_tree> swapped_tree;
-//     swapped_tree = static_pointer_cast<pearl_tree>(foreground_trees[tree_idx]);
-//     shared_ptr<pearl_tree> drifted_tree = swapped_tree->replaced_tree;
-//
-//     if (!drifted_tree || !swapped_tree) {
-//         cout << "Empty drifted or swapped tree" << endl;
-//         return -1;
-//     }
-//
-//     int window = 25; // TODO
-//     int drift_correct = 0;
-//     int swap_correct = 0;
-//     double drifted_tree_accuracy = 0.0;
-//     double swapped_tree_accuracy = 0.0;
-//     int edit_distance = 0;
-//
-//     deque<int> drifted_tree_predictions;
-//     deque<int> swapped_tree_predictions;
-//
-//     for (int i = backtrack_instances.size() - 1; i >= 0; i--) {
-//         if (!backtrack_instances[i]) {
-//             LOG("cur instance is null!");
-//             exit(1);
-//         }
-//
-//         int drift_predicted_label = drifted_tree->predict(*backtrack_instances[i], false);
-//         int swap_predicted_label = swapped_tree->predict(*backtrack_instances[i], false);
-//
-//         drifted_tree_predictions.push_back(drift_predicted_label);
-//         swapped_tree_predictions.push_back(swap_predicted_label);
-//         if (drift_predicted_label == swap_predicted_label) {
-//             edit_distance += 1;
-//         }
-//
-//         if (drifted_tree_predictions.size() >= window) {
-//             if (drifted_tree_predictions.front() != swapped_tree_predictions.front()) {
-//                 edit_distance -= 1;
-//             }
-//             drifted_tree_predictions.pop_front();
-//             swapped_tree_predictions.pop_front();
-//
-//             if (edit_distance == 5) {
-//                 return backtrack_instances.size() - i;
-//             }
-//         }
-//     }
-//
-//     return -1;
-// }
-
 int trans_pearl::find_last_actual_drift_point(int tree_idx) {
     if (backtrack_instances.size() > num_max_backtrack_instances) {
         LOG("backtrack_instances has too many data instance");
@@ -496,6 +444,25 @@ void trans_pearl::generate_data(int tree_idx, int num_instances) {
     shared_ptr<pearl_tree> drifted_tree = static_pointer_cast<pearl_tree>(foreground_trees[tree_idx]);
 
     for (int i = 0; i < num_instances; i++) {
-        drifted_tree->tree->generate_data((DenseInstance*) instance);
+        DenseInstance* pseudo_instance = drifted_tree->tree->generate_data((DenseInstance*) instance);
     }
+}
+
+
+// class trans_pearl_tree
+
+trans_pearl_tree::trans_pearl_tree(int tree_pool_id,
+                                   int kappa_window_size,
+                                   int pro_drift_window_size,
+                                   double warning_delta,
+                                   double drift_delta,
+                                   double hybrid_delta,
+                                   std::mt19937 mrand)
+        : pearl_tree(tree_pool_id,
+                     kappa_window_size,
+                     pro_drift_window_size,
+                     warning_delta,
+                     drift_delta,
+                     hybrid_delta,
+                     mrand) {
 }
