@@ -445,7 +445,38 @@ void trans_pearl::generate_data(int tree_idx, int num_instances) {
 
     for (int i = 0; i < num_instances; i++) {
         DenseInstance* pseudo_instance = drifted_tree->tree->generate_data((DenseInstance*) instance);
+        vector<DenseInstance*> pseudo_instances = find_k_closest_instances(pseudo_instance, 1);
     }
+}
+
+vector<DenseInstance*> trans_pearl::find_k_closest_instances(DenseInstance* target_instance, int k) {
+    vector<DenseInstance*> close_instances;
+
+    int num_row = target_instance->modifiedAttIndices.size();
+    int num_col = backtrack_instances.size();
+
+    vector<vector<double>> data(num_row + 1, vector<double>(num_col));
+    for (auto backtrack_instance : backtrack_instances) {
+        for (int i = 0; i < target_instance->modifiedAttIndices.size(); i++) {
+            int attIdx = target_instance->modifiedAttIndices[i];
+            data[i].push_back(backtrack_instance->getInputAttributeValue(attIdx));
+        }
+        // data[target_instance->modifiedAttIndices.size()].push_back(backtrack_instance->getLabel());
+    }
+
+    for (int i = 0; i < num_row + 1; i++) {
+        for (int j = 0; j < num_col; j++) {
+            cout << data[i][j] << " ";
+        }
+        cout << endl;
+    }
+
+    Matrix dataPoints(num_row + 1, num_col);
+    for (int i = 0; i < target_instance->modifiedAttIndices.size() + 1; i++) {
+        dataPoints.row(i) = Eigen::VectorXd::Map(&data[i][0], data[i].size());
+    }
+
+    return close_instances;
 }
 
 
