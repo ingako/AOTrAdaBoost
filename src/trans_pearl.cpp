@@ -445,43 +445,93 @@ void trans_pearl::generate_data(int tree_idx, int num_instances) {
 
     for (int i = 0; i < num_instances; i++) {
         DenseInstance* pseudo_instance = drifted_tree->tree->generate_data((DenseInstance*) instance);
-        vector<DenseInstance*> pseudo_instances = find_k_closest_instances(pseudo_instance, 1);
+        vector<DenseInstance*> close_instances = find_k_closest_instances(pseudo_instance, 1);
+
+        cout << "Before KNN-----------------------------" << endl;
+        for (double v : pseudo_instance->mInputData) {
+            cout << v << " ";
+        }
+        for (double v : pseudo_instance->mOutputData) {
+            cout << v << " ";
+        }
+        cout << endl;
+
+        // Copy the rest of the attribute values to the pseudo instance
+        for (Instance* close_instance : close_instances) {
+            vector<int> modified_indices = pseudo_instance->modifiedAttIndices;
+            for (int i = 0; i < close_instance->getNumberInputAttributes(); i++) {
+                if (std::find(modified_indices.begin(), modified_indices.end(), i) != modified_indices.end()) {
+                    continue;
+                }
+                pseudo_instance->setValue(i, close_instance->getInputAttributeValue(i));
+            }
+        }
+
+        cout << "After KNN-----------------------------" << endl;
+        for (double v : pseudo_instance->mInputData) {
+            cout << v << " ";
+        }
+        for (double v : pseudo_instance->mOutputData) {
+            cout << v << " ";
+        }
+        cout << endl;
     }
 }
 
 vector<DenseInstance*> trans_pearl::find_k_closest_instances(DenseInstance* target_instance, int k) {
-    vector<DenseInstance*> close_instances;
-
-    int num_row = target_instance->modifiedAttIndices.size();
+    int num_row = target_instance->modifiedAttIndices.size() + 1;
     int num_col = backtrack_instances.size();
 
-    vector<vector<double>> data(num_row + 1, vector<double>(num_col));
+    // Prepare data points
+    vector<vector<double>> data(num_row, vector<double>());
     for (auto backtrack_instance : backtrack_instances) {
-        for (int i = 0; i < target_instance->modifiedAttIndices.size(); i++) {
+        for (int i = 0; i < num_row - 1; i++) {
             int attIdx = target_instance->modifiedAttIndices[i];
             data[i].push_back(backtrack_instance->getInputAttributeValue(attIdx));
         }
-        // data[target_instance->modifiedAttIndices.size()].push_back(backtrack_instance->getLabel());
+        data[num_row - 1].push_back(backtrack_instance->getLabel());
     }
 
-    for (int i = 0; i < num_row + 1; i++) {
-        for (int j = 0; j < num_col; j++) {
-            cout << data[i][j] << " ";
-        }
-        cout << endl;
-    }
-
-    Matrix dataPoints(num_row + 1, num_col);
-    for (int i = 0; i < target_instance->modifiedAttIndices.size() + 1; i++) {
+    Matrix dataPoints(num_row, num_col);
+    for (int i = 0; i < num_row; i++) {
         dataPoints.row(i) = Eigen::VectorXd::Map(&data[i][0], data[i].size());
+    }
+    cout << dataPoints << endl;
+
+    knn::KDTreeMinkowski<double, knn::EuclideanDistance<double>> kdtree(dataPoints);
+    kdtree.setBucketSize(16);
+    kdtree.setCompact(false);
+    kdtree.setBalanced(false);
+    kdtree.setTakeRoot(true);
+    kdtree.setMaxDistance(0);
+    kdtree.setThreads(2);
+    kdtree.build();
+
+    vector<vector<double>> target_data(num_row, vector<double>());
+    for (int i = 0; i < num_row - 1; i++) {
+        int attIdx = target_instance->modifiedAttIndices[i];
+        target_data[i].push_back(target_instance->getInputAttributeValue(attIdx));
+    }
+    target_data[num_row - 1].push_back(target_instance->getLabel());
+
+    Matrix queryPoints(num_row, 1);
+    for (int i = 0; i < num_row; i++) {
+        queryPoints.row(i) = Eigen::VectorXd::Map(&target_data[i][0], target_data[i].size());
+    }
+
+    Matrixi indices;
+    Matrix distances;
+    kdtree.query(queryPoints, k, indices, distances);
+
+    vector<DenseInstance*> close_instances;
+    for (int i = 0; i < k; i++) {
+        close_instances.push_back((DenseInstance*) backtrack_instances[indices(i, 0)]);
     }
 
     return close_instances;
 }
 
-
 // class trans_pearl_tree
-
 trans_pearl_tree::trans_pearl_tree(int tree_pool_id,
                                    int kappa_window_size,
                                    int pro_drift_window_size,
