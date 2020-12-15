@@ -2,7 +2,10 @@
 #define __TRANS_PEARL_H__
 
 #include "PEARL/src/cpp/pearl.h"
-// #include "knn-cpp/include/knn/kdtree_minkowski.h"
+#include "knn-cpp/include/knn/kdtree_minkowski.h"
+
+typedef Eigen::MatrixXd Matrix;
+typedef knn::Matrixi Matrixi;
 
 class trans_pearl_tree;
 
@@ -68,6 +71,8 @@ class trans_pearl : public pearl {
                                       shared_ptr<arf_tree>& tree2);
         // virtual void predict_with_state_adaption(vector<int>& votes, int actual_label);
         bool detect_stability(int error_count, unique_ptr<HT::ADWIN>& detector);
+
+        vector<DenseInstance*> find_k_closest_instances(DenseInstance* target_instance, int k);
 };
 
 class trans_pearl_tree : public pearl_tree {
