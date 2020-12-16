@@ -277,38 +277,45 @@ if __name__ == '__main__':
                 acc_per_drift_logger=acc_per_drift_logger)
     else:
         if args.transfer:
-            pearl = trans_pearl(args.num_trees,
-                              args.max_num_candidate_trees,
-                              repo_size,
-                              args.edit_distance_threshold,
-                              args.kappa_window,
-                              args.lossy_window_size,
-                              args.reuse_window_size,
-                              arf_max_features,
-                              args.poisson_lambda,
-                              args.random_state,
-                              args.bg_kappa_threshold,
-                              args.cd_kappa_threshold,
-                              args.reuse_rate_upper_bound,
-                              args.warning_delta,
-                              args.drift_delta,
-                              args.pro_drift_window,
-                              args.hybrid_delta,
-                              args.backtrack_window,
-                              args.stability_delta)
+            stream_sequences = deque()
+            with open(f"{args.stream_sequences_file_path}", 'r') as f:
+                for line in f:
+                    stream_sequences.append([int(v) for v in line.split()])
+
+            classifiers = []
+            for _ in range(len(data_file_paths)):
+                pearl = trans_pearl(args.num_trees,
+                                    args.max_num_candidate_trees,
+                                    repo_size,
+                                    args.edit_distance_threshold,
+                                    args.kappa_window,
+                                    args.lossy_window_size,
+                                    args.reuse_window_size,
+                                    arf_max_features,
+                                    args.poisson_lambda,
+                                    args.random_state,
+                                    args.bg_kappa_threshold,
+                                    args.cd_kappa_threshold,
+                                    args.reuse_rate_upper_bound,
+                                    args.warning_delta,
+                                    args.drift_delta,
+                                    args.pro_drift_window,
+                                    args.hybrid_delta,
+                                    args.backtrack_window,
+                                    args.stability_delta)
+                classifiers.append(pearl)
 
             # all_predicted_drift_locs, accepted_predicted_drift_locs = \
             Evaluator.prequential_evaluation_transfer(
-                classifier=pearl,
-                stream=data_file_path,
+                classifiers=classifiers,
+                data_file_paths=data_file_paths,
                 max_samples=args.max_samples,
                 sample_freq=args.sample_freq,
                 metrics_logger=metrics_logger,
                 seq_logger=seq_logger,
-                pro_drift_window=args.pro_drift_window,
-                drift_interval_seq_len=args.sequence_len,
                 expected_drift_locs=expected_drift_locs,
-                acc_per_drift_logger=acc_per_drift_logger)
+                acc_per_drift_logger=acc_per_drift_logger,
+                stream_sequences=stream_sequences)
 
             # accepted_predicted_drifts_log_file = \
             #     f"{result_directory}/accepted-predicted-drifts-{args.generator_seed}.log"
