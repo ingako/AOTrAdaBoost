@@ -50,7 +50,8 @@ class trans_pearl : public pearl {
                 const vector<int>& drifted_tree_pos_list,
                 deque<shared_ptr<pearl_tree>>& _candidate_trees);
 
-        void generate_data(int tree_idx, int num_instances);
+        double evaluate_tree(int tree_idx, vector<Instance*> pseudo_instances);
+        vector<Instance*> generate_data(int tree_idx, int num_instances);
 
     private:
 
@@ -74,7 +75,6 @@ class trans_pearl : public pearl {
         // virtual void predict_with_state_adaption(vector<int>& votes, int actual_label);
         bool detect_stability(int error_count, unique_ptr<HT::ADWIN>& detector);
 
-
         vector<DenseInstance*> find_k_closest_instances(DenseInstance* target_instance,
                                                         vector<Instance*>& instance_store,
                                                         int k);
@@ -95,6 +95,7 @@ public:
     int stream_end_idx;
 
     virtual void train(Instance &instance);
+    // double evaluate_tree(vector<Instance*> pseudo_instances);
 };
 
 #endif

@@ -114,4 +114,5 @@ class Evaluator:
                 metric.window_actual_labels = []
                 metric.window_predicted_labels = []
 
-        classifier.generate_data(0, 1)
+        generated_data = classifier.generate_data(0, 1)
+        classifier.evaluate_tree(0, generated_data)

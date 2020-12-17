@@ -442,8 +442,14 @@ vector<int> trans_pearl::get_stable_tree_indices() {
     return stable_tree_indices;
 }
 
-void trans_pearl::generate_data(int tree_idx, int num_instances) {
+double trans_pearl::evaluate_tree(int tree_idx, vector<Instance*> pseudo_instances) {
+    cout << "evaluate_tree: " << pseudo_instances.size() << endl;
+    return 0.0;
+}
+
+vector<Instance*> trans_pearl::generate_data(int tree_idx, int num_instances) {
     shared_ptr<trans_pearl_tree> tree = static_pointer_cast<trans_pearl_tree>(foreground_trees[tree_idx]);
+    vector<Instance*> pseudo_instances;
 
     for (int i = 0; i < num_instances; i++) {
         DenseInstance *pseudo_instance = tree->tree->generate_data((DenseInstance *) instance);
@@ -468,6 +474,7 @@ void trans_pearl::generate_data(int tree_idx, int num_instances) {
                     continue;
                 }
                 pseudo_instance->setValue(j, close_instance->getInputAttributeValue(j));
+                pseudo_instances.push_back(pseudo_instance);
             }
         }
 
@@ -480,6 +487,8 @@ void trans_pearl::generate_data(int tree_idx, int num_instances) {
         // }
         // cout << endl;
     }
+
+    return pseudo_instances;
 }
 
 vector<DenseInstance*> trans_pearl::find_k_closest_instances(DenseInstance* target_instance,
@@ -563,3 +572,7 @@ void trans_pearl_tree::train(Instance& instance) {
     }
     pearl_tree::train(instance);
 }
+
+// double trans_pearl_tree::evaluate(vector<Instance*> pseudo_instances) {
+//
+// }

@@ -4,10 +4,18 @@
 #include <PEARL/src/cpp/pearl.h>
 #include "trans_pearl.h"
 
+PYBIND11_MAKE_OPAQUE(vector<Instance*>);
+
 namespace py = pybind11;
 
 PYBIND11_MODULE(trans_pearl, m) {
     m.doc() = "trans_pearl's implementation in C++";
+
+    py::class_<std::vector<Instance*>>(m, "IntInstance")
+            .def(py::init<>())
+            .def("clear", &std::vector<Instance*>::clear)
+            .def("pop_back", &std::vector<Instance*>::pop_back)
+            .def("__len__", [](const std::vector<Instance*> &v) { return v.size(); });
 
     py::class_<adaptive_random_forest>(m, "adaptive_random_forest")
         .def(py::init<int,
@@ -81,5 +89,6 @@ PYBIND11_MODULE(trans_pearl, m) {
         .def("update_drifted_tree_indices", &trans_pearl::update_drifted_tree_indices)
         .def("set_expected_drift_prob", &trans_pearl::set_expected_drift_prob)
         .def("get_stable_tree_indices", &trans_pearl::get_stable_tree_indices)
-        .def("generate_data", &trans_pearl::generate_data);
+        .def("generate_data", &trans_pearl::generate_data)
+        .def("evaluate_tree", &trans_pearl::evaluate_tree);
 }
