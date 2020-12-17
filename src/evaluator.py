@@ -57,7 +57,8 @@ class Evaluator:
         metric = classifier_metrics_list[classifier_idx]
         classifier_metrics_list[classifier_idx].start_time = time.process_time()
 
-        for count in range(0, max_samples):
+        # for count in range(0, max_samples):
+        for count in range(0, 10000):
             if count == switch_location:
                 # Switch streams to simulate parallel streams
                 metric.total_time += time.process_time() - metric.start_time
@@ -72,7 +73,7 @@ class Evaluator:
                 break
 
             # test
-            prediction = classifiers.predict()
+            prediction = classifier.predict()
 
             actual_label = classifier.get_cur_instance_label()
             if prediction == actual_label:

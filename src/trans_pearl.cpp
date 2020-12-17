@@ -73,6 +73,8 @@ shared_ptr<pearl_tree> trans_pearl::make_pearl_tree(int tree_pool_id) {
 // find drifted trees, update potential_drifted_tree_indices
 // candidate trees make predictions
 void trans_pearl::train() {
+    stream_instance_idx += 1;
+
     if (foreground_trees.empty()) {
         init();
     }
@@ -441,55 +443,59 @@ vector<int> trans_pearl::get_stable_tree_indices() {
 }
 
 void trans_pearl::generate_data(int tree_idx, int num_instances) {
-    shared_ptr<pearl_tree> drifted_tree = static_pointer_cast<pearl_tree>(foreground_trees[tree_idx]);
+    shared_ptr<trans_pearl_tree> tree = static_pointer_cast<trans_pearl_tree>(foreground_trees[tree_idx]);
 
     for (int i = 0; i < num_instances; i++) {
-        DenseInstance* pseudo_instance = drifted_tree->tree->generate_data((DenseInstance*) instance);
-        vector<DenseInstance*> close_instances = find_k_closest_instances(pseudo_instance, 1);
+        DenseInstance *pseudo_instance = tree->tree->generate_data((DenseInstance *) instance);
+        vector<DenseInstance *> close_instances = find_k_closest_instances(pseudo_instance,
+                                                                           tree->instance_store,
+                                                                           1);
 
-        cout << "Before KNN-----------------------------" << endl;
-        for (double v : pseudo_instance->mInputData) {
-            cout << v << " ";
-        }
-        for (double v : pseudo_instance->mOutputData) {
-            cout << v << " ";
-        }
-        cout << endl;
+        // cout << "Before KNN-----------------------------" << endl;
+        // for (double v : pseudo_instance->mInputData) {
+        //     cout << v << " ";
+        // }
+        // for (double v : pseudo_instance->mOutputData) {
+        //     cout << v << " ";
+        // }
+        // cout << endl;
 
         // Copy the rest of the attribute values to the pseudo instance
-        for (Instance* close_instance : close_instances) {
+        for (Instance *close_instance : close_instances) {
             vector<int> modified_indices = pseudo_instance->modifiedAttIndices;
-            for (int i = 0; i < close_instance->getNumberInputAttributes(); i++) {
-                if (std::find(modified_indices.begin(), modified_indices.end(), i) != modified_indices.end()) {
+            for (int j = 0; j < close_instance->getNumberInputAttributes(); j++) {
+                if (std::find(modified_indices.begin(), modified_indices.end(), j) != modified_indices.end()) {
                     continue;
                 }
-                pseudo_instance->setValue(i, close_instance->getInputAttributeValue(i));
+                pseudo_instance->setValue(j, close_instance->getInputAttributeValue(j));
             }
         }
 
-        cout << "After KNN-----------------------------" << endl;
-        for (double v : pseudo_instance->mInputData) {
-            cout << v << " ";
-        }
-        for (double v : pseudo_instance->mOutputData) {
-            cout << v << " ";
-        }
-        cout << endl;
+        // cout << "After KNN-----------------------------" << endl;
+        // for (double v : pseudo_instance->mInputData) {
+        //     cout << v << " ";
+        // }
+        // for (double v : pseudo_instance->mOutputData) {
+        //     cout << v << " ";
+        // }
+        // cout << endl;
     }
 }
 
-vector<DenseInstance*> trans_pearl::find_k_closest_instances(DenseInstance* target_instance, int k) {
+vector<DenseInstance*> trans_pearl::find_k_closest_instances(DenseInstance* target_instance,
+                                                             vector<Instance*>& instance_store,
+                                                             int k) {
     int num_row = target_instance->modifiedAttIndices.size() + 1;
-    int num_col = backtrack_instances.size();
+    int num_col = instance_store.size();
 
     // Prepare data points
     vector<vector<double>> data(num_row, vector<double>());
-    for (auto backtrack_instance : backtrack_instances) {
+    for (auto cur_instance : instance_store) {
         for (int i = 0; i < num_row - 1; i++) {
             int attIdx = target_instance->modifiedAttIndices[i];
-            data[i].push_back(backtrack_instance->getInputAttributeValue(attIdx));
+            data[i].push_back(cur_instance->getInputAttributeValue(attIdx));
         }
-        data[num_row - 1].push_back(backtrack_instance->getLabel());
+        data[num_row - 1].push_back(cur_instance->getLabel());
     }
 
     Matrix dataPoints(num_row, num_col);
@@ -525,7 +531,7 @@ vector<DenseInstance*> trans_pearl::find_k_closest_instances(DenseInstance* targ
 
     vector<DenseInstance*> close_instances;
     for (int i = 0; i < k; i++) {
-        close_instances.push_back((DenseInstance*) backtrack_instances[indices(i, 0)]);
+        close_instances.push_back((DenseInstance*) instance_store[indices(i, 0)]);
     }
 
     return close_instances;
@@ -546,4 +552,14 @@ trans_pearl_tree::trans_pearl_tree(int tree_pool_id,
                      drift_delta,
                      hybrid_delta,
                      mrand) {
+}
+
+void trans_pearl_tree::train(Instance& instance) {
+    this->instance_store.push_back(&instance);
+    if (this->bg_pearl_tree != nullptr) {
+        shared_ptr<trans_pearl_tree> trans_bg_tree;
+        trans_bg_tree = static_pointer_cast<trans_pearl_tree>(this->bg_pearl_tree);
+        trans_bg_tree->instance_store.push_back(&instance);
+    }
+    pearl_tree::train(instance);
 }

@@ -256,6 +256,9 @@ if __name__ == '__main__':
         with open(f"{expected_drift_locs_log}", 'r') as f:
             for line in f:
                 expected_drift_locs.append(int(line))
+    if args.transfer:
+        stream_sequences_file_path = "/home/oceanwu/git/transfer/data/agrawal/abrupt/sequence.txt"
+
 
     if not args.enable_state_adaption and not args.enable_state_graph:
         print("init adaptive_random_forest")
@@ -278,12 +281,13 @@ if __name__ == '__main__':
     else:
         if args.transfer:
             stream_sequences = deque()
-            with open(f"{args.stream_sequences_file_path}", 'r') as f:
+
+            with open(f"{stream_sequences_file_path}", 'r') as f:
                 for line in f:
                     stream_sequences.append([int(v) for v in line.split()])
 
             classifiers = []
-            for _ in range(len(data_file_paths)):
+            for _ in range(len(data_file_path.split(";"))):
                 pearl = trans_pearl(args.num_trees,
                                     args.max_num_candidate_trees,
                                     repo_size,
@@ -308,7 +312,7 @@ if __name__ == '__main__':
             # all_predicted_drift_locs, accepted_predicted_drift_locs = \
             Evaluator.prequential_evaluation_transfer(
                 classifiers=classifiers,
-                data_file_paths=data_file_paths,
+                data_file_paths=data_file_path.split(";"),
                 max_samples=args.max_samples,
                 sample_freq=args.sample_freq,
                 metrics_logger=metrics_logger,

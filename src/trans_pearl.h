@@ -54,6 +54,8 @@ class trans_pearl : public pearl {
 
     private:
 
+        int stream_instance_idx = 0;
+
         int pro_drift_window_size = 100;
         double hybrid_delta = 0.001;
         int backtrack_window = 25;
@@ -72,7 +74,10 @@ class trans_pearl : public pearl {
         // virtual void predict_with_state_adaption(vector<int>& votes, int actual_label);
         bool detect_stability(int error_count, unique_ptr<HT::ADWIN>& detector);
 
-        vector<DenseInstance*> find_k_closest_instances(DenseInstance* target_instance, int k);
+
+        vector<DenseInstance*> find_k_closest_instances(DenseInstance* target_instance,
+                                                        vector<Instance*>& instance_store,
+                                                        int k);
 };
 
 class trans_pearl_tree : public pearl_tree {
@@ -84,9 +89,12 @@ public:
                      double drift_delta,
                      double hybrid_delta,
                      std::mt19937 mrand);
+    vector<Instance*> instance_store;
 
     int stream_start_idx;
     int stream_end_idx;
+
+    virtual void train(Instance &instance);
 };
 
 #endif
