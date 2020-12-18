@@ -89,6 +89,8 @@ PYBIND11_MODULE(trans_pearl, m) {
         .def("update_drifted_tree_indices", &trans_pearl::update_drifted_tree_indices)
         .def("set_expected_drift_prob", &trans_pearl::set_expected_drift_prob)
         .def("get_stable_tree_indices", &trans_pearl::get_stable_tree_indices)
-        .def("generate_data", &trans_pearl::generate_data)
-        .def("evaluate_tree", &trans_pearl::evaluate_tree);
+        .def("has_actual_drifted_trees", &trans_pearl::has_actual_drifted_trees)
+        .def("generate_data", &trans_pearl::generate_data, pybind11::return_value_policy::reference)
+        .def("evaluate_tree", &trans_pearl::evaluate_tree)
+        .def("transfer", &trans_pearl::transfer);
 }

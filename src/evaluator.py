@@ -114,5 +114,13 @@ class Evaluator:
                 metric.window_actual_labels = []
                 metric.window_predicted_labels = []
 
-        generated_data = classifier.generate_data(0, 1)
-        classifier.evaluate_tree(0, generated_data)
+        # For each tree in other streams,
+        # generate pseudo data for current drifted trees to match
+        if classifier.has_actual_drifted_trees():
+            for i in range(len(classifiers)):
+                for j in range(classifier.get_tree_pool_size()):
+                    print(f"generating data j={j}")
+                    generated_data = classifiers[i].generate_data(j, 1)
+                    print("evaluating tree")
+                    classifier.evaluate_tree(generated_data)
+            classifier.transfer()

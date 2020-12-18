@@ -50,10 +50,12 @@ class trans_pearl : public pearl {
                 const vector<int>& drifted_tree_pos_list,
                 deque<shared_ptr<pearl_tree>>& _candidate_trees);
 
-        double evaluate_tree(int tree_idx, vector<Instance*> pseudo_instances);
+        bool has_actual_drifted_trees();
+        void evaluate_tree(vector<Instance*> &pseudo_instances);
         vector<Instance*> generate_data(int tree_idx, int num_instances);
+        void transfer();
 
-    private:
+        private:
 
         int stream_instance_idx = 0;
 
@@ -71,13 +73,17 @@ class trans_pearl : public pearl {
         deque<shared_ptr<pearl_tree>> predicted_trees;
 
         static bool compare_kappa_arf(shared_ptr<arf_tree>& tree1,
-                                      shared_ptr<arf_tree>& tree2);
+                                          shared_ptr<arf_tree>& tree2);
         // virtual void predict_with_state_adaption(vector<int>& votes, int actual_label);
         bool detect_stability(int error_count, unique_ptr<HT::ADWIN>& detector);
 
+        // Transfer
+        vector<int> actual_drifted_trees;
+        vector<double> best_perf_metrics_for_drifted_trees;
+        vector<vector<Instance*>> instance_stores;
         vector<DenseInstance*> find_k_closest_instances(DenseInstance* target_instance,
-                                                        vector<Instance*>& instance_store,
-                                                        int k);
+                                                            vector<Instance*>& instance_store,
+                                                            int k);
 };
 
 class trans_pearl_tree : public pearl_tree {
@@ -89,13 +95,10 @@ public:
                      double drift_delta,
                      double hybrid_delta,
                      std::mt19937 mrand);
+
     vector<Instance*> instance_store;
 
-    int stream_start_idx;
-    int stream_end_idx;
-
     virtual void train(Instance &instance);
-    // double evaluate_tree(vector<Instance*> pseudo_instances);
 };
 
 #endif
