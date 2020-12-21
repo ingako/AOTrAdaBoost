@@ -479,6 +479,17 @@ void trans_pearl::transfer() {
     instance_stores.clear();
     best_perf_metrics_for_drifted_trees.clear();
     actual_drifted_trees.clear();
+
+    // Train each drifted tree with its best matching concept
+    for (int i = 0; i < actual_drifted_trees.size(); i++) {
+        for (int j = 0; j < instance_stores.size(); j++) {
+            shared_ptr<trans_pearl_tree> tree = static_pointer_cast<trans_pearl_tree>(foreground_trees[actual_drifted_trees[i]]);
+            vector<Instance*> instance_store = instance_stores[j];
+            for (auto instance : instance_store) {
+                tree->train(*instance);
+            }
+        }
+    }
 }
 
 vector<Instance*> trans_pearl::generate_data(int tree_idx, int num_instances) {

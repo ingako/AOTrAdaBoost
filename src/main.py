@@ -172,11 +172,12 @@ if __name__ == '__main__':
         data_file_path = f"{data_file_dir}/{args.dataset_name}.{args.data_format}"
         result_directory = args.dataset_name
     # TODO
-    data_file_path = "/home/oceanwu/git/transfer/data/agrawal/abrupt/0.arff"
+    data_file_path = "/home/oceanwu/git/transfer/data/agrawal/abrupt/0.arff;/home/oceanwu/git/transfer/data/agrawal/abrupt/0.arff"
 
-    if not os.path.isfile(data_file_path):
-        print(f"Cannot locate file at {data_file_path}")
-        exit()
+    for file_path in data_file_path.split(";"):
+        if not os.path.isfile(file_path):
+            print(f"Cannot locate file at {file_path}")
+            exit()
 
     print(f"Preparing stream from file {data_file_path}...")
 

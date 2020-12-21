@@ -118,9 +118,13 @@ class Evaluator:
         # generate pseudo data for current drifted trees to match
         if classifier.has_actual_drifted_trees():
             for i in range(len(classifiers)):
-                for j in range(classifier.get_tree_pool_size()):
+                if i == classifier_idx:
+                    continue
+                print(classifiers[classifier_idx].get_tree_pool_size())
+                for j in range(classifiers[classifier_idx].get_tree_pool_size()):
                     print(f"generating data j={j}")
                     generated_data = classifiers[i].generate_data(j, 1)
                     print("evaluating tree")
                     classifier.evaluate_tree(generated_data)
+            # Each drifted trees in current stream gets trained by the best matching concept
             classifier.transfer()
