@@ -493,7 +493,7 @@ void trans_pearl::transfer() {
 }
 
 vector<Instance*> trans_pearl::generate_data(int tree_idx, int num_instances) {
-    shared_ptr<trans_pearl_tree> tree = static_pointer_cast<trans_pearl_tree>(foreground_trees[tree_idx]);
+    shared_ptr<trans_pearl_tree> tree = static_pointer_cast<trans_pearl_tree>(tree_pool[tree_idx]);
     vector<Instance*> pseudo_instances;
 
     for (int i = 0; i < num_instances; i++) {
