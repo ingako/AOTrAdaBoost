@@ -84,6 +84,13 @@ class trans_pearl : public pearl {
         vector<DenseInstance*> find_k_closest_instances(DenseInstance* target_instance,
                                                             vector<Instance*>& instance_store,
                                                             int k);
+
+        // ozaboost
+        vector<double> scms;
+        vector<double> swms;
+        long training_weights_seen_by_model = 0;
+        double getEnsembleMemberWeight(int tree_idx);
+        virtual int predict();
 };
 
 class trans_pearl_tree : public pearl_tree {
