@@ -78,6 +78,18 @@ shared_ptr<pearl_tree> trans_pearl::make_pearl_tree(int tree_pool_id) {
 void trans_pearl::train() {
     stream_instance_idx += 1;
 
+    if (drift_warning_period_lengths.size() == 0) {
+        drift_warning_period_lengths.resize(num_trees, 0);
+    }
+    if (stream_instance_idx == 90000) {
+        cout << "drift_warning_distance: " << endl;
+        for (int i = 0; i < num_trees; i++) {
+            cout << drift_warning_period_lengths[i] << " ";
+        }
+        cout << endl;
+    }
+
+
     if (foreground_trees.empty()) {
         init();
     }
@@ -111,6 +123,10 @@ void trans_pearl::train() {
         // std::poisson_distribution<int> poisson_distr(lambda);
         // int weight = poisson_distr(mrand);
 
+        if (drift_warning_period_lengths[i] > 0) {
+            drift_warning_period_lengths[i]++;
+        }
+
         // ozaboost
         std::poisson_distribution<int> poisson_distr(lambda_d);
         int weight = poisson_distr(mrand);
@@ -134,6 +150,9 @@ void trans_pearl::train() {
             warning_detected_only = true;
             cur_tree->bg_pearl_tree = make_pearl_tree(-1);
             cur_tree->warning_detector->resetChange();
+            if (drift_warning_period_lengths[i] == 0) {
+                drift_warning_period_lengths[i] = 1;
+            }
         }
 
         // detect drift
@@ -144,6 +163,10 @@ void trans_pearl::train() {
 
             cur_tree->warning_detector->resetChange();
             cur_tree->drift_detector->resetChange();
+
+            if (drift_warning_period_lengths[i] > 0) {
+                drift_warning_period_lengths[i] = -drift_warning_period_lengths[i];
+            }
         }
 
         if (warning_detected_only) {
@@ -655,8 +678,16 @@ trans_pearl_tree::trans_pearl_tree(int tree_pool_id,
                      warning_delta,
                      drift_delta,
                      hybrid_delta,
-                     mrand) {
-}
+                     mrand) {}
+
+trans_pearl_tree::trans_pearl_tree(trans_pearl_tree const &rhs)
+        : pearl_tree(rhs.tree_pool_id,
+                     rhs.kappa_window_size,
+                     rhs.pro_drift_window_size,
+                     rhs.warning_delta,
+                     rhs.drift_delta,
+                     rhs.hybrid_delta,
+                     rhs.mrand) {}
 
 void trans_pearl_tree::train(Instance& instance) {
     this->instance_store.push_back(&instance);
@@ -668,6 +699,51 @@ void trans_pearl_tree::train(Instance& instance) {
     pearl_tree::train(instance);
 }
 
-// double trans_pearl_tree::evaluate(vector<Instance*> pseudo_instances) {
-//
-// }
+
+// class boosted_bg_tree_pool
+trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(int pool_size,
+                     vector<Instance*> mini_batch,
+                     shared_ptr<trans_pearl_tree> tree_template) :
+        pool_size(pool_size),
+        mini_batch(mini_batch),
+        tree_template(tree_template) {}
+
+void trans_pearl::boosted_bg_tree_pool::train(Instance *instance,
+                                              bool is_same_distribution) {
+    update_bbt();
+    boost(1);
+}
+
+shared_ptr<trans_pearl_tree> trans_pearl::boosted_bg_tree_pool::get_best_model() {
+    double idx = 0;
+    double highest_weight = model_weights[0];
+    for (int i = 1; i < model_weights.size(); i++) {
+        if (highest_weight < model_weights[i]) {
+            highest_weight = model_weights[i];
+        }
+    }
+    return pool[idx];
+}
+
+void trans_pearl::boosted_bg_tree_pool::update_bbt() {
+    bbt_counter++;
+
+    // create a new boosting tree for current mini-batch
+    shared_ptr<trans_pearl_tree> new_tree = std::make_shared<trans_pearl_tree>(*tree_template);
+    if (pool.size() < pool_size) {
+        pool.push_back(new_tree);
+    } else {
+        pool[bbt_counter % pool_size] = new_tree;
+    }
+}
+
+void trans_pearl::boosted_bg_tree_pool::boost(int is_same_distribution) {
+    double weight = 1.0 / mini_batch.size();
+    for (auto tree : pool) {
+        for (Instance* instance : mini_batch) {
+            instance->setWeight(weight);
+            tree->train(*instance);
+        }
+
+    }
+}
