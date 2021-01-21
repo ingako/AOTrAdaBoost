@@ -8,6 +8,7 @@ typedef Eigen::MatrixXd Matrix;
 typedef knn::Matrixi Matrixi;
 
 class trans_pearl_tree;
+class boosted_bg_tree_pool;
 
 class trans_pearl : public pearl {
 
@@ -55,9 +56,16 @@ class trans_pearl : public pearl {
         vector<Instance*> generate_data(int tree_idx, int num_instances);
         void transfer();
 
-        private:
+    private:
 
         int stream_instance_idx = 0;
+        vector<int> drift_warning_period_lengths;
+
+        // boosting for transfer learning
+        int boosted_bg_tree_pool_size = 10;
+        int mini_batch_size = 100;
+        // one boosted background tree pool per foreground tree
+        vector<boosted_bg_tree_pool> bbt_pools;
 
         int pro_drift_window_size = 100;
         double hybrid_delta = 0.001;
@@ -106,6 +114,32 @@ public:
     vector<Instance*> instance_store;
 
     virtual void train(Instance &instance);
+};
+
+class boosted_bg_tree_pool {
+public:
+    boosted_bg_tree_pool(int boosted_bg_tree_pool_size,
+                         vector<Instance*> mini_batch) :
+            boosted_bg_tree_pool_size(boosted_bg_tree_pool_size),
+            mini_batch(mini_batch) {}
+
+    // training starts when a mini_batch is ready
+    void train(Instance* instance, bool is_same_distribution);
+    unique_ptr<trans_pearl_tree> get_best_model();
+
+private:
+    int boosted_bg_tree_pool_size = 10;
+    vector<Instance*> mini_batch;
+    vector<double> instance_weights;
+    vector<double> model_weights;
+    vector<double> oob_errors; // out-of-bag errors per boosted bg tree
+    vector<unique_ptr<trans_pearl_tree>> bbt_pool;
+
+    // data comes from the same distribution during drift warning period
+    bool is_same_distribution = true;
+
+    // execute replacement strategies when the bbt pool is full
+    void update_bbt();
 };
 
 #endif
