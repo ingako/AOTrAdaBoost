@@ -58,8 +58,8 @@ class Evaluator:
         classifier_metrics_list[classifier_idx].start_time = time.process_time()
 
         # for count in range(0, max_samples):
-        for count in range(0, 10000):
-            if count == switch_location:
+        for count in range(0, 100000):
+            if count == switch_location and len(stream_sequences) > 0:
                 # Switch streams to simulate parallel streams
                 metric.total_time += time.process_time() - metric.start_time
 
@@ -114,17 +114,30 @@ class Evaluator:
                 metric.window_actual_labels = []
                 metric.window_predicted_labels = []
 
+        exit(0)
+
+        # For each actual drifted trees
+        # 1. Concept Matching
         # For each tree in other streams,
         # generate pseudo data for current drifted trees to match
+        # 2. Boosted transfer
         if classifier.has_actual_drifted_trees():
             for i in range(len(classifiers)):
                 if i == classifier_idx:
                     continue
                 print(classifiers[classifier_idx].get_tree_pool_size())
+
+                # Concept matching
                 for j in range(classifiers[classifier_idx].get_tree_pool_size()):
                     print(f"generating data j={j}")
                     generated_data = classifiers[i].generate_data(j, 1)
                     print("evaluating tree")
                     classifier.evaluate_tree(generated_data)
+
+            # Boosted transfer
             # Each drifted trees in current stream gets trained by the best matching concept
-            classifier.transfer()
+            # Boost until stopping criteria met
+            while True:
+                generated_data = classifiers[i].generate_data(j, 1)
+                if classifier.transfer(generated_data):
+                    break
