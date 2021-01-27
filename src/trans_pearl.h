@@ -99,12 +99,11 @@ class trans_pearl : public pearl {
         int pool_size = 10;
         int mini_batch_size = 100;
         // one boosted background tree pool per foreground tree
-        vector<boosted_bg_tree_pool> bbt_pools;
+        vector<unique_ptr<boosted_bg_tree_pool>> bbt_pools;
 
         class boosted_bg_tree_pool {
         public:
             boosted_bg_tree_pool(int pool_size,
-                                 vector<Instance*> mini_batch,
                                  shared_ptr<trans_pearl_tree> tree_template);
 
             // training starts when a mini_batch is ready
@@ -112,14 +111,14 @@ class trans_pearl : public pearl {
             shared_ptr<trans_pearl_tree> get_best_model();
 
         private:
-            int pool_size = 10;
-            int bbt_counter = 0;
+            long pool_size = 10;
+            long bbt_counter = 0;
+            shared_ptr<trans_pearl_tree> tree_template;
             vector<Instance*> mini_batch;
             vector<double> instance_weights;
             vector<double> model_weights;
-            vector<double> oob_errors; // out-of-bag errors per boosted bg tree
             vector<shared_ptr<trans_pearl_tree>> pool;
-            shared_ptr<trans_pearl_tree> tree_template;
+            vector<double> oob_errors_vec; // out-of-bag errors per boosted bg tree
 
             // data comes from the same distribution during drift warning period
             bool is_same_distribution = true;

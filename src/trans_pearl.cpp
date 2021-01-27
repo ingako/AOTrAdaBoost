@@ -51,6 +51,7 @@ void trans_pearl::init() {
         temp_tree_pool[i] = static_pointer_cast<trans_pearl_tree>( make_pearl_tree(i));
         foreground_trees.push_back(temp_tree_pool[i]);
         stability_detectors.push_back(make_unique<HT::ADWIN>(warning_delta));
+        bbt_pools.push_back(nullptr);
     }
 
     for (auto t : temp_tree_pool) {
@@ -115,21 +116,21 @@ void trans_pearl::train() {
 
 
     // ozaboost
-    double lambda_d = this->lambda;
-    training_weights_seen_by_model += 1; // TODO
+    // double lambda_d = this->lambda;
+    // training_weights_seen_by_model += 1; // TODO
 
     for (int i = 0; i < num_trees; i++) {
-        // online bagging
-        // std::poisson_distribution<int> poisson_distr(lambda);
-        // int weight = poisson_distr(mrand);
-
         if (drift_warning_period_lengths[i] > 0) {
             drift_warning_period_lengths[i]++;
         }
 
-        // ozaboost
-        std::poisson_distribution<int> poisson_distr(lambda_d);
+        // online bagging
+        std::poisson_distribution<int> poisson_distr(lambda);
         int weight = poisson_distr(mrand);
+
+        // ozaboost
+        // std::poisson_distribution<int> poisson_distr(lambda_d);
+        // int weight = poisson_distr(mrand);
 
         if (weight == 0) {
             continue;
@@ -153,6 +154,10 @@ void trans_pearl::train() {
             if (drift_warning_period_lengths[i] == 0) {
                 drift_warning_period_lengths[i] = 1;
             }
+
+            shared_ptr<trans_pearl_tree> tree_template
+                    = static_pointer_cast<trans_pearl_tree>(cur_tree->bg_pearl_tree);
+            bbt_pools[i] = make_unique<boosted_bg_tree_pool>(100, tree_template) ;
         }
 
         // detect drift
@@ -182,14 +187,14 @@ void trans_pearl::train() {
         }
 
         // ozaboost: update weights
-        if (error_count == 0) {
-            this->scms[i] += lambda_d;
-            lambda_d *= this->training_weights_seen_by_model / (2 * this->scms[i]);
+        // if (error_count == 0) {
+        //     this->scms[i] += lambda_d;
+        //     lambda_d *= this->training_weights_seen_by_model / (2 * this->scms[i]);
 
-        } else {
-            this->swms[i] += lambda_d;
-            lambda_d *= this->training_weights_seen_by_model / (2 * this->swms[i]);
-        }
+        // } else {
+        //     this->swms[i] += lambda_d;
+        //     lambda_d *= this->training_weights_seen_by_model / (2 * this->swms[i]);
+        // }
     }
 
     for (int i = 0; i < candidate_trees.size(); i++) {
@@ -702,10 +707,8 @@ void trans_pearl_tree::train(Instance& instance) {
 
 // class boosted_bg_tree_pool
 trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(int pool_size,
-                     vector<Instance*> mini_batch,
                      shared_ptr<trans_pearl_tree> tree_template) :
         pool_size(pool_size),
-        mini_batch(mini_batch),
         tree_template(tree_template) {}
 
 void trans_pearl::boosted_bg_tree_pool::train(Instance *instance,
