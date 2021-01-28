@@ -104,28 +104,35 @@ class trans_pearl : public pearl {
         class boosted_bg_tree_pool {
         public:
             boosted_bg_tree_pool(int pool_size,
-                                 shared_ptr<trans_pearl_tree> tree_template);
+                                 int mini_batch_size,
+                                 shared_ptr<trans_pearl_tree> tree_template,
+                                 int lambda);
 
             // training starts when a mini_batch is ready
             void train(Instance* instance, bool is_same_distribution);
             shared_ptr<trans_pearl_tree> get_best_model();
 
+            void online_tradaboost(Instance* instance, bool _is_same_distribution );
+
         private:
+            int lambda = 1;
+            std::mt19937 mrand;
+
             long pool_size = 10;
             long bbt_counter = 0;
+            long mini_batch_size = 100;
             shared_ptr<trans_pearl_tree> tree_template;
             vector<Instance*> mini_batch;
-            vector<double> instance_weights;
-            vector<double> model_weights;
             vector<shared_ptr<trans_pearl_tree>> pool;
-            vector<double> oob_errors_vec; // out-of-bag errors per boosted bg tree
+            vector<int> oob_tree_correct_count; // count of out-of-bag correctly predicted trees per instance
+            vector<int> oob_tree_total_count; // count of oob trees per instance
 
             // data comes from the same distribution during drift warning period
             bool is_same_distribution = true;
 
             // execute replacement strategies when the bbt pool is full
             void update_bbt();
-            void boost(int is_same_distribution);
+            void boost();
         };
 
 };

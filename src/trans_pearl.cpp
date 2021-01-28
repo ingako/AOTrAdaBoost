@@ -157,7 +157,7 @@ void trans_pearl::train() {
 
             shared_ptr<trans_pearl_tree> tree_template
                     = static_pointer_cast<trans_pearl_tree>(cur_tree->bg_pearl_tree);
-            bbt_pools[i] = make_unique<boosted_bg_tree_pool>(100, tree_template) ;
+            bbt_pools[i] = make_unique<boosted_bg_tree_pool>(100, tree_template, this->lambda);
         }
 
         // detect drift
@@ -172,6 +172,12 @@ void trans_pearl::train() {
             if (drift_warning_period_lengths[i] > 0) {
                 drift_warning_period_lengths[i] = -drift_warning_period_lengths[i];
             }
+
+            if (bbt_pools[i] != nullptr) {
+                // TODO after drift detection, trigger concept matching & transfer
+                actual_drifted_trees.push_back(i);
+                bbt_pools[i] = nullptr;
+            }
         }
 
         if (warning_detected_only) {
@@ -184,6 +190,11 @@ void trans_pearl::train() {
                 && detect_stability(correct_count, stability_detectors[i])) {
             stability_detectors[i] = make_unique<HT::ADWIN>(stability_delta);
             stable_tree_indices.push_back(i);
+        }
+
+        if (bbt_pools[i] != nullptr) {
+            // Add instance to mini-batch. Boosting auto triggers when the mini-batch is full.
+            bbt_pools[i]->online_tradaboost(instance->clone(), true);
         }
 
         // ozaboost: update weights
@@ -210,11 +221,12 @@ void trans_pearl::train() {
         pearl::select_candidate_trees(warning_tree_pos_list);
     }
 
+    // TODO drifted tree replacement only triggered in evaluator.
     // if actual drifts are detected, swap trees and update cur_state
-    if (drifted_tree_pos_list.size() > 0) {
-        actual_drifted_trees = adapt_state(drifted_tree_pos_list, false);
-        // pearl::adapt_state(drifted_tree_pos_list);
-    }
+    // if (drifted_tree_pos_list.size() > 0) {
+    //     actual_drifted_trees = adapt_state(drifted_tree_pos_list, false);
+    //     // pearl::adapt_state(drifted_tree_pos_list);
+    // }
 }
 
 void trans_pearl::select_predicted_trees(const vector<int>& warning_tree_pos_list) {
@@ -707,25 +719,41 @@ void trans_pearl_tree::train(Instance& instance) {
 
 // class boosted_bg_tree_pool
 trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(int pool_size,
-                     shared_ptr<trans_pearl_tree> tree_template) :
+                     int mini_batch_size,
+                     shared_ptr<trans_pearl_tree> tree_template,
+                     int lambda):
+        mini_batch_size(mini_batch_size),
         pool_size(pool_size),
-        tree_template(tree_template) {}
+        tree_template(tree_template),
+        lambda(lambda) {
 
-void trans_pearl::boosted_bg_tree_pool::train(Instance *instance,
-                                              bool is_same_distribution) {
+    mrand = std::mt19937(42);
+    oob_tree_correct_count.resize(mini_batch_size, 0);
+    oob_tree_total_count.resize(mini_batch_size, 0);
+}
+
+void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
+                                                          bool _is_same_distribution) {
+    if (mini_batch.size() == 0) {
+        this->is_same_distribution = _is_same_distribution;
+    } else if (this->is_same_distribution != _is_same_distribution) {
+        cout << "online_tradaboost: inconsistent instance distributions" << endl;
+        exit(1);
+    }
+
+    if (mini_batch.size() < mini_batch_size) {
+        mini_batch.push_back(instance);
+        return;
+    }
+
     update_bbt();
-    boost(1);
+    boost();
+
+    mini_batch.clear();
 }
 
 shared_ptr<trans_pearl_tree> trans_pearl::boosted_bg_tree_pool::get_best_model() {
-    double idx = 0;
-    double highest_weight = model_weights[0];
-    for (int i = 1; i < model_weights.size(); i++) {
-        if (highest_weight < model_weights[i]) {
-            highest_weight = model_weights[i];
-        }
-    }
-    return pool[idx];
+    return nullptr;
 }
 
 void trans_pearl::boosted_bg_tree_pool::update_bbt() {
@@ -740,13 +768,48 @@ void trans_pearl::boosted_bg_tree_pool::update_bbt() {
     }
 }
 
-void trans_pearl::boosted_bg_tree_pool::boost(int is_same_distribution) {
-    double weight = 1.0 / mini_batch.size();
+void trans_pearl::boosted_bg_tree_pool::boost() {
+    for (Instance* instance : mini_batch) {
+        double weight = 1.0 / mini_batch.size();
+        instance->setWeight(weight);
+    }
+
+    double z = 0;
     for (auto tree : pool) {
-        for (Instance* instance : mini_batch) {
+        for (int i = 0; i < mini_batch.size(); i++) {
+            Instance* instance = mini_batch[i];
+
+            // bagging
+            std::poisson_distribution<int> poisson_distr(lambda);
+            int k = poisson_distr(mrand);
+
+            double weight = instance->getWeight();
+            instance->setWeight(k * weight);
+            for (int i = 0; i < k; i++) {
+                tree->train(*instance);
+            }
             instance->setWeight(weight);
-            tree->train(*instance);
+
+            // boosting based on out-of-bag errors
+            if (k == 0) {
+                oob_tree_total_count[i] += 1;
+                if (tree->predict(*instance, false) == instance->getLabel()) {
+                    oob_tree_correct_count[i] += 1;
+                }
+
+                double c = oob_tree_correct_count[i]
+                                / oob_tree_total_count[i];
+                if (is_same_distribution) {
+                    instance->setWeight(1 - c);
+                } else {
+                    instance->setWeight(c);
+                }
+            }
+            z += instance->getWeight();
         }
 
+        for (Instance* instance : mini_batch) {
+            instance->setWeight(instance->getWeight() / z);
+        }
     }
 }
