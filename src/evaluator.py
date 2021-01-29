@@ -30,8 +30,8 @@ class ClassifierMetrics:
 
 class Evaluator:
 
-    @staticmethod
     def prequential_evaluation_transfer(
+                    self,
                     classifiers,
                     data_file_paths,
                     max_samples,
@@ -93,6 +93,7 @@ class Evaluator:
 
             # train
             classifier.train()
+            self._transfer(classifier, classifier_idx, classifiers)
 
             # classifier.delete_cur_instance()
 
@@ -114,7 +115,7 @@ class Evaluator:
                 metric.window_actual_labels = []
                 metric.window_predicted_labels = []
 
-        exit(0)
+    def _transfer(self, classifier, classifier_idx, classifiers):
 
         # For each actual drifted trees
         # 1. Concept Matching
@@ -141,3 +142,6 @@ class Evaluator:
                 generated_data = classifiers[i].generate_data(j, 1)
                 if classifier.transfer(generated_data):
                     break
+
+        # TODO compare transferred trees to candidate trees
+        # adapt_candidate_and_transnfer_trees()

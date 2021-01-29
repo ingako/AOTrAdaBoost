@@ -311,7 +311,8 @@ if __name__ == '__main__':
                 classifiers.append(pearl)
 
             # all_predicted_drift_locs, accepted_predicted_drift_locs = \
-            Evaluator.prequential_evaluation_transfer(
+            evaluator = Evaluator()
+            evaluator.prequential_evaluation_transfer(
                 classifiers=classifiers,
                 data_file_paths=data_file_path.split(";"),
                 max_samples=args.max_samples,
@@ -354,7 +355,8 @@ if __name__ == '__main__':
                           args.drift_delta,
                           args.enable_state_adaption,
                           args.enable_state_graph)
-            Evaluator.prequential_evaluation(
+            evaluator = Evaluator()
+            evaluator.prequential_evaluation(
                     classifier=pearl,
                     stream=data_file_path,
                     max_samples=args.max_samples,
