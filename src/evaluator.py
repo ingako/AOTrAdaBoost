@@ -93,27 +93,30 @@ class Evaluator:
 
             # train
             classifier.train()
-            self._transfer(classifier, classifier_idx, classifiers)
+            # if classifier.has_actual_drifted_trees():
+            #     self._transfer(classifier, classifier_idx, classifiers)
 
             # classifier.delete_cur_instance()
+            self._log_metrics(count, sample_freq, metric, classifier, metrics_logger)
 
-            if count % sample_freq == 0 and count != 0:
-                elapsed_time = time.process_time() - metric.start_time
-                accuracy = metric.correct / sample_freq
-                kappa = cohen_kappa_score(metric.window_actual_labels,
-                                          metric.window_predicted_labels)
+    def _log_metrics(self, count, sample_freq, metric, classifier, metrics_logger):
+        if count % sample_freq == 0 and count != 0:
+            elapsed_time = time.process_time() - metric.start_time
+            accuracy = metric.correct / sample_freq
+            kappa = cohen_kappa_score(metric.window_actual_labels,
+                                      metric.window_predicted_labels)
 
-                candidate_tree_size = classifier.get_candidate_tree_group_size()
-                tree_pool_size = classifier.get_tree_pool_size()
+            candidate_tree_size = classifier.get_candidate_tree_group_size()
+            tree_pool_size = classifier.get_tree_pool_size()
 
-                # TODO multiple output streams
-                print(f"{count},{accuracy},{kappa},{candidate_tree_size},{tree_pool_size},{elapsed_time}")
-                metrics_logger.info(f"{count},{accuracy},{kappa}," \
-                                    f"{candidate_tree_size},{tree_pool_size},{elapsed_time}")
+            # TODO multiple output streams
+            print(f"{count},{accuracy},{kappa},{candidate_tree_size},{tree_pool_size},{elapsed_time}")
+            metrics_logger.info(f"{count},{accuracy},{kappa}," \
+                                f"{candidate_tree_size},{tree_pool_size},{elapsed_time}")
 
-                metric.correct = 0
-                metric.window_actual_labels = []
-                metric.window_predicted_labels = []
+            metric.correct = 0
+            metric.window_actual_labels = []
+            metric.window_predicted_labels = []
 
     def _transfer(self, classifier, classifier_idx, classifiers):
 
@@ -122,26 +125,25 @@ class Evaluator:
         # For each tree in other streams,
         # generate pseudo data for current drifted trees to match
         # 2. Boosted transfer
-        if classifier.has_actual_drifted_trees():
-            for i in range(len(classifiers)):
-                if i == classifier_idx:
-                    continue
-                print(classifiers[classifier_idx].get_tree_pool_size())
+        for i in range(len(classifiers)):
+            if i == classifier_idx:
+                continue
+            print(classifiers[classifier_idx].get_tree_pool_size())
 
-                # Concept matching
-                for j in range(classifiers[classifier_idx].get_tree_pool_size()):
-                    print(f"generating data j={j}")
-                    generated_data = classifiers[i].generate_data(j, 1)
-                    print("evaluating tree")
-                    classifier.evaluate_tree(generated_data)
-
-            # Boosted transfer
-            # Each drifted trees in current stream gets trained by the best matching concept
-            # Boost until stopping criteria met
-            while True:
+            # Concept matching
+            for j in range(classifiers[classifier_idx].get_tree_pool_size()):
+                print(f"generating data j={j}")
                 generated_data = classifiers[i].generate_data(j, 1)
-                if classifier.transfer(generated_data):
-                    break
+                print("evaluating tree")
+                classifier.evaluate_tree(generated_data)
+
+        # Boosted transfer
+        # Each drifted trees in current stream gets trained by the best matching concept
+        # Boost until stopping criteria met
+        while True:
+            generated_data = classifiers[i].generate_data(j, 1)
+            if classifier.transfer(generated_data):
+                break
 
         # TODO compare transferred trees to candidate trees
         # adapt_candidate_and_transnfer_trees()
