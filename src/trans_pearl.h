@@ -85,11 +85,11 @@ class trans_pearl : public pearl {
                                                             int k);
 
         // ozaboost
-        vector<double> scms;
-        vector<double> swms;
-        long training_weights_seen_by_model = 0;
-        double getEnsembleMemberWeight(int tree_idx);
-        virtual int predict();
+        // vector<double> scms;
+        // vector<double> swms;
+        // long training_weights_seen_by_model = 0;
+        // double getEnsembleMemberWeight(int tree_idx);
+        // virtual int predict();
 
 
         // boosting for transfer learning

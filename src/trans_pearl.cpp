@@ -58,8 +58,8 @@ void trans_pearl::init() {
         tree_pool.push_back(t);
     }
 
-    scms.resize(num_trees, 0);
-    swms.resize(num_trees, 0);
+    // scms.resize(num_trees, 0);
+    // swms.resize(num_trees, 0);
 }
 
 shared_ptr<pearl_tree> trans_pearl::make_pearl_tree(int tree_pool_id) {
@@ -657,30 +657,30 @@ vector<DenseInstance*> trans_pearl::find_k_closest_instances(DenseInstance* targ
 }
 
 // ozaboost
-double trans_pearl::getEnsembleMemberWeight(int i) {
-    double em = this->swms[i] / (this->scms[i] + this->swms[i]);
-    if ((em == 0.0) || (em > 0.5)) {
-        return 0.0;
-    }
-    double Bm = em / (1.0 - em);
-    return log(1.0 / Bm);
-}
+// double trans_pearl::getEnsembleMemberWeight(int i) {
+//     double em = this->swms[i] / (this->scms[i] + this->swms[i]);
+//     if ((em == 0.0) || (em > 0.5)) {
+//         return 0.0;
+//     }
+//     double Bm = em / (1.0 - em);
+//     return log(1.0 / Bm);
+// }
 
-int trans_pearl::predict() {
-    if (foreground_trees.empty()) {
-        init();
-    }
-
-    int num_classes = instance->getNumberClasses();
-    vector<int> votes(num_classes, 0);
-
-    for (int i = 0; i < num_trees; i++) {
-        int predicted_label = foreground_trees[i]->predict(*instance);
-        votes[predicted_label] += getEnsembleMemberWeight(i);
-    }
-
-    return vote(votes);
-}
+// int trans_pearl::predict() {
+//     if (foreground_trees.empty()) {
+//         init();
+//     }
+//
+//     int num_classes = instance->getNumberClasses();
+//     vector<int> votes(num_classes, 0);
+//
+//     for (int i = 0; i < num_trees; i++) {
+//         int predicted_label = foreground_trees[i]->predict(*instance);
+//         votes[predicted_label] += getEnsembleMemberWeight(i);
+//     }
+//
+//     return vote(votes);
+// }
 
 
 // class trans_pearl_tree
