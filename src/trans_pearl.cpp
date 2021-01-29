@@ -157,7 +157,7 @@ void trans_pearl::train() {
 
             shared_ptr<trans_pearl_tree> tree_template
                     = static_pointer_cast<trans_pearl_tree>(cur_tree->bg_pearl_tree);
-            bbt_pools[i] = make_unique<boosted_bg_tree_pool>(100, tree_template, this->lambda);
+            bbt_pools[i] = make_unique<boosted_bg_tree_pool>(100, 100, tree_template, this->lambda);
         }
 
         // detect drift
@@ -176,6 +176,8 @@ void trans_pearl::train() {
             if (bbt_pools[i] != nullptr) {
                 // TODO after drift detection, trigger concept matching & transfer
                 actual_drifted_trees.push_back(i);
+
+                bbt_pools[i]->online_tradaboost(instance->clone(), true, true);
                 bbt_pools[i] = nullptr;
             }
         }
@@ -194,7 +196,7 @@ void trans_pearl::train() {
 
         if (bbt_pools[i] != nullptr) {
             // Add instance to mini-batch. Boosting auto triggers when the mini-batch is full.
-            bbt_pools[i]->online_tradaboost(instance->clone(), true);
+            bbt_pools[i]->online_tradaboost(instance->clone(), true, false);
         }
 
         // ozaboost: update weights
@@ -733,7 +735,8 @@ trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(int pool_size,
 }
 
 void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
-                                                          bool _is_same_distribution) {
+                                                          bool _is_same_distribution,
+                                                          bool force_trigger) {
     if (mini_batch.size() == 0) {
         this->is_same_distribution = _is_same_distribution;
     } else if (this->is_same_distribution != _is_same_distribution) {
@@ -743,7 +746,9 @@ void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
 
     if (mini_batch.size() < mini_batch_size) {
         mini_batch.push_back(instance);
-        return;
+        if (!force_trigger) {
+            return;
+        }
     }
 
     update_bbt();

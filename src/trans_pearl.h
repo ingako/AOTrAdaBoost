@@ -96,7 +96,7 @@ class trans_pearl : public pearl {
         int stream_instance_idx = 0;
         vector<int> drift_warning_period_lengths;
 
-        int pool_size = 10;
+        int pool_size = 100;
         int mini_batch_size = 100;
         // one boosted background tree pool per foreground tree
         vector<unique_ptr<boosted_bg_tree_pool>> bbt_pools;
@@ -112,7 +112,7 @@ class trans_pearl : public pearl {
             void train(Instance* instance, bool is_same_distribution);
             shared_ptr<trans_pearl_tree> get_best_model();
 
-            void online_tradaboost(Instance* instance, bool _is_same_distribution );
+            void online_tradaboost(Instance* instance, bool _is_same_distribution, bool force_trigger);
 
         private:
             int lambda = 1;
