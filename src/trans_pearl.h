@@ -51,12 +51,13 @@ class trans_pearl : public pearl {
                 const vector<int>& drifted_tree_pos_list,
                 deque<shared_ptr<pearl_tree>>& _candidate_trees);
 
+        vector<shared_ptr<pearl_tree>>& get_concept_repo();
+        void register_tree_pool(vector<shared_ptr<pearl_tree>>& pool);
         bool has_actual_drifted_trees();
-        void evaluate_tree(vector<Instance*> &pseudo_instances);
-        vector<Instance*> generate_data(int tree_idx, int num_instances);
+        void match_concept();
         void transfer();
 
-    private:
+private:
 
         int pro_drift_window_size = 100;
         double hybrid_delta = 0.001;
@@ -77,12 +78,11 @@ class trans_pearl : public pearl {
         bool detect_stability(int error_count, unique_ptr<HT::ADWIN>& detector);
 
         // Transfer
+        vector<vector<shared_ptr<pearl_tree>>*> registered_tree_pools;
         vector<int> actual_drifted_trees;
         vector<double> best_perf_metrics_for_drifted_trees;
         vector<vector<Instance*>> instance_stores;
-        vector<DenseInstance*> find_k_closest_instances(DenseInstance* target_instance,
-                                                            vector<Instance*>& instance_store,
-                                                            int k);
+        void evaluate_tree(vector<Instance*> &pseudo_instances);
 
         // ozaboost
         // vector<double> scms;
@@ -90,7 +90,6 @@ class trans_pearl : public pearl {
         // long training_weights_seen_by_model = 0;
         // double getEnsembleMemberWeight(int tree_idx);
         // virtual int predict();
-
 
         // boosting for transfer learning
         int stream_instance_idx = 0;
@@ -111,8 +110,9 @@ class trans_pearl : public pearl {
             // training starts when a mini_batch is ready
             void train(Instance* instance, bool is_same_distribution);
             shared_ptr<trans_pearl_tree> get_best_model();
-
             void online_tradaboost(Instance* instance, bool _is_same_distribution, bool force_trigger);
+
+            vector<Instance*> warning_period_instances;
 
         private:
             int lambda = 1;
@@ -152,6 +152,11 @@ public:
     vector<Instance*> instance_store;
 
     virtual void train(Instance &instance);
+
+    vector<Instance*> generate_data(Instance* instance, int num_instances);
+    vector<DenseInstance*> find_k_closest_instances(DenseInstance* target_instance,
+                                                    vector<Instance*>& instance_store,
+                                                    int k);
 };
 
 #endif
