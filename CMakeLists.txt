@@ -2,9 +2,12 @@ cmake_minimum_required(VERSION 3.10)
 
 project(trans_pearl VERSION 0.0.1)
 
+include_directories(include ${Eigen_INCLUDE_DIRS})
+
 set(sourcefiles
 src/trans_pearl_bindings.cpp
 src/trans_pearl.cpp
+src/trans_pearl_wrapper.cpp
 )
 
 set(include_dirs
@@ -22,7 +25,8 @@ set(ADD_PEARL_AS_LIBRARY ON)
 
 add_subdirectory(third_party/PEARL)
 add_subdirectory(third_party/pybind11)
-pybind11_add_module(trans_pearl SHARED ${sourcefiles})
+add_subdirectory(third_party/knn-cpp)
+pybind11_add_module(trans_pearl_wrapper SHARED ${sourcefiles})
 
-target_link_libraries(trans_pearl PUBLIC pearl)
-target_include_directories(trans_pearl PUBLIC ${include_dirs})
+target_link_libraries(trans_pearl_wrapper PUBLIC pearl)
+target_include_directories(trans_pearl_wrapper PUBLIC ${include_dirs})
