@@ -15,7 +15,7 @@ for path in paths:
         sys.path.append(path)
 
 # from build.trans_pearl import pearl, trans_pearl
-from trans_pearl import pearl, trans_pearl
+# from trans_pearl import pearl, trans_pearl
 
 
 class ClassifierMetrics:
@@ -32,7 +32,7 @@ class Evaluator:
 
     def prequential_evaluation_transfer(
                     self,
-                    classifiers,
+                    classifier,
                     data_file_paths,
                     max_samples,
                     sample_freq,
@@ -47,27 +47,30 @@ class Evaluator:
         # 3. Tradaboost to target concept (decide #instances later)
 
         classifier_metrics_list = []
-        for i in range(len(classifiers)):
-            classifiers[i].init_data_source(data_file_paths[i])
+        for i in range(len(data_file_paths)):
+            classifier.init_data_source(i, data_file_paths[i])
             classifier_metrics_list.append(ClassifierMetrics())
 
         stream_sequence = stream_sequences.popleft()
         classifier_idx, switch_location = stream_sequence[0], stream_sequence[1]
-        classifier = classifiers[classifier_idx]
+        classifier.switch_classifier(classifier_idx)
         metric = classifier_metrics_list[classifier_idx]
         classifier_metrics_list[classifier_idx].start_time = time.process_time()
 
         # for count in range(0, max_samples):
         for count in range(0, 100000):
             if count == switch_location and len(stream_sequences) > 0:
+                print(f"tree_pool_size {classifier.get_tree_pool_size()}")
                 # Switch streams to simulate parallel streams
                 metric.total_time += time.process_time() - metric.start_time
 
                 stream_sequence = stream_sequences.popleft()
                 classifier_idx, switch_location = stream_sequence[0], stream_sequence[1]
-                classifier = classifiers[classifier_idx]
+                classifier.switch_classifier(classifier_idx)
                 metric = classifier_metrics_list[classifier_idx]
                 metric.start_time = time.process_time()
+
+                print(f"switching to classifier_idx {classifier_idx}")
 
             if not classifier.get_next_instance():
                 break
@@ -93,8 +96,8 @@ class Evaluator:
 
             # train
             classifier.train()
-            # if classifier.has_actual_drifted_trees():
-            #     self._transfer(classifier, classifier_idx, classifiers)
+            if classifier.has_actual_drifted_trees():
+                self._transfer(classifier)
 
             # classifier.delete_cur_instance()
             self._log_metrics(count, sample_freq, metric, classifier, metrics_logger)
@@ -118,32 +121,36 @@ class Evaluator:
             metric.window_actual_labels = []
             metric.window_predicted_labels = []
 
-    def _transfer(self, classifier, classifier_idx, classifiers):
+    def _transfer(self, classifier):
 
         # For each actual drifted trees
         # 1. Concept Matching
         # For each tree in other streams,
         # generate pseudo data for current drifted trees to match
         # 2. Boosted transfer
-        for i in range(len(classifiers)):
-            if i == classifier_idx:
-                continue
-            print(classifiers[classifier_idx].get_tree_pool_size())
 
-            # Concept matching
-            for j in range(classifiers[classifier_idx].get_tree_pool_size()):
-                print(f"generating data j={j}")
-                generated_data = classifiers[i].generate_data(j, 1)
-                print("evaluating tree")
-                classifier.evaluate_tree(generated_data)
+        # for i in range(len(classifiers)):
+        #     if i == classifier_idx:
+        #         continue
+        #     print(classifiers[classifier_idx].get_tree_pool_size())
+
+        #     # Concept matching
+        #     for j in range(classifiers[classifier_idx].get_tree_pool_size()):
+        #         print(f"generating data j={j}")
+        #         generated_data = classifiers[i].generate_data(j, 300)
+        #         print("evaluating tree")
+        #         classifier.evaluate_tree(generated_data)
+
+        classifier.match_concept()
 
         # Boosted transfer
         # Each drifted trees in current stream gets trained by the best matching concept
         # Boost until stopping criteria met
-        while True:
-            generated_data = classifiers[i].generate_data(j, 1)
-            if classifier.transfer(generated_data):
-                break
+
+        # while True:
+        #     generated_data = classifiers[i].generate_data(j, 1)
+        #     if classifier.transfer(generated_data):
+        #         break
 
         # TODO compare transferred trees to candidate trees
         # adapt_candidate_and_transnfer_trees()

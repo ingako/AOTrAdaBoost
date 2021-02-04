@@ -19,7 +19,9 @@ if path not in sys.path:
     sys.path.append(path)
 
 # from build.trans_pearl import adaptive_random_forest, pearl, trans_pearl
-from trans_pearl import adaptive_random_forest, pearl, trans_pearl
+# from trans_pearl import adaptive_random_forest, pearl, trans_pearl
+from trans_pearl_wrapper import adaptive_random_forest, pearl, trans_pearl_wrapper
+# from trans_pearl_wrapper import trans_pearl_wrapper
 
 formatter = logging.Formatter('%(message)s')
 
@@ -287,33 +289,31 @@ if __name__ == '__main__':
                 for line in f:
                     stream_sequences.append([int(v) for v in line.split()])
 
-            classifiers = []
-            for _ in range(len(data_file_path.split(";"))):
-                pearl = trans_pearl(args.num_trees,
-                                    args.max_num_candidate_trees,
-                                    repo_size,
-                                    args.edit_distance_threshold,
-                                    args.kappa_window,
-                                    args.lossy_window_size,
-                                    args.reuse_window_size,
-                                    arf_max_features,
-                                    args.poisson_lambda,
-                                    args.random_state,
-                                    args.bg_kappa_threshold,
-                                    args.cd_kappa_threshold,
-                                    args.reuse_rate_upper_bound,
-                                    args.warning_delta,
-                                    args.drift_delta,
-                                    args.pro_drift_window,
-                                    args.hybrid_delta,
-                                    args.backtrack_window,
-                                    args.stability_delta)
-                classifiers.append(pearl)
+            classifier = trans_pearl_wrapper(len(data_file_path.split(";")),
+                                             args.num_trees,
+                                             args.max_num_candidate_trees,
+                                             repo_size,
+                                             args.edit_distance_threshold,
+                                             args.kappa_window,
+                                             args.lossy_window_size,
+                                             args.reuse_window_size,
+                                             arf_max_features,
+                                             args.poisson_lambda,
+                                             args.random_state,
+                                             args.bg_kappa_threshold,
+                                             args.cd_kappa_threshold,
+                                             args.reuse_rate_upper_bound,
+                                             args.warning_delta,
+                                             args.drift_delta,
+                                             args.pro_drift_window,
+                                             args.hybrid_delta,
+                                             args.backtrack_window,
+                                             args.stability_delta)
 
             # all_predicted_drift_locs, accepted_predicted_drift_locs = \
             evaluator = Evaluator()
             evaluator.prequential_evaluation_transfer(
-                classifiers=classifiers,
+                classifier=classifier,
                 data_file_paths=data_file_path.split(";"),
                 max_samples=args.max_samples,
                 sample_freq=args.sample_freq,
