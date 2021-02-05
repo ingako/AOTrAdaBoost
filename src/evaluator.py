@@ -17,7 +17,6 @@ for path in paths:
 # from build.trans_pearl import pearl, trans_pearl
 # from trans_pearl import pearl, trans_pearl
 
-
 class ClassifierMetrics:
     def __init__(self):
         self.correct = 0
@@ -26,6 +25,7 @@ class ClassifierMetrics:
         self.window_predicted_labels = []
         self.start_time = 0
         self.total_time = 0
+        self.instance_idx = 0
 
 
 class Evaluator:
@@ -42,10 +42,6 @@ class Evaluator:
                     acc_per_drift_logger,
                     stream_sequences):
 
-        # 1. Generate pseudo data
-        # 2. Match a similar source concept
-        # 3. Tradaboost to target concept (decide #instances later)
-
         classifier_metrics_list = []
         for i in range(len(data_file_paths)):
             classifier.init_data_source(i, data_file_paths[i])
@@ -59,8 +55,8 @@ class Evaluator:
 
         # for count in range(0, max_samples):
         for count in range(0, 100000):
+            # TODO
             if count == switch_location and len(stream_sequences) > 0:
-                print(f"tree_pool_size {classifier.get_tree_pool_size()}")
                 # Switch streams to simulate parallel streams
                 metric.total_time += time.process_time() - metric.start_time
 
@@ -74,6 +70,7 @@ class Evaluator:
 
             if not classifier.get_next_instance():
                 break
+            classifier_metrics_list[classifier_idx].instance_idx += 1
 
             # test
             prediction = classifier.predict()
@@ -96,11 +93,11 @@ class Evaluator:
 
             # train
             classifier.train()
-            if classifier.has_actual_drifted_trees():
-                self._transfer(classifier)
+            # if classifier.has_actual_drifted_trees():
+            #     self._transfer(classifier)
 
             # classifier.delete_cur_instance()
-            self._log_metrics(count, sample_freq, metric, classifier, metrics_logger)
+            self._log_metrics(classifier_metrics_list[classifier_idx].instance_idx, sample_freq, metric, classifier, metrics_logger)
 
     def _log_metrics(self, count, sample_freq, metric, classifier, metrics_logger):
         if count % sample_freq == 0 and count != 0:
@@ -120,37 +117,3 @@ class Evaluator:
             metric.correct = 0
             metric.window_actual_labels = []
             metric.window_predicted_labels = []
-
-    def _transfer(self, classifier):
-
-        # For each actual drifted trees
-        # 1. Concept Matching
-        # For each tree in other streams,
-        # generate pseudo data for current drifted trees to match
-        # 2. Boosted transfer
-
-        # for i in range(len(classifiers)):
-        #     if i == classifier_idx:
-        #         continue
-        #     print(classifiers[classifier_idx].get_tree_pool_size())
-
-        #     # Concept matching
-        #     for j in range(classifiers[classifier_idx].get_tree_pool_size()):
-        #         print(f"generating data j={j}")
-        #         generated_data = classifiers[i].generate_data(j, 300)
-        #         print("evaluating tree")
-        #         classifier.evaluate_tree(generated_data)
-
-        classifier.match_concept()
-
-        # Boosted transfer
-        # Each drifted trees in current stream gets trained by the best matching concept
-        # Boost until stopping criteria met
-
-        # while True:
-        #     generated_data = classifiers[i].generate_data(j, 1)
-        #     if classifier.transfer(generated_data):
-        #         break
-
-        # TODO compare transferred trees to candidate trees
-        # adapt_candidate_and_transnfer_trees()
