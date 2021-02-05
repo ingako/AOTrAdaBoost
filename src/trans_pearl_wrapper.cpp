@@ -91,6 +91,3 @@ int trans_pearl_wrapper::get_tree_pool_size() {
     return current_classifier->get_tree_pool_size();
 }
 
-void trans_pearl_wrapper::match_concept() {
-    current_classifier->match_concept();
-}

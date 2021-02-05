@@ -133,7 +133,6 @@ PYBIND11_MODULE(trans_pearl_wrapper, m) {
                 .def("get_next_instance", &trans_pearl_wrapper::get_next_instance)
                 .def("has_actual_drifted_trees", &trans_pearl_wrapper::has_actual_drifted_trees)
                 .def("get_candidate_tree_group_size", &trans_pearl_wrapper::get_candidate_tree_group_size)
-                .def("get_tree_pool_size", &trans_pearl_wrapper::get_tree_pool_size)
-                .def("match_concept", &trans_pearl_wrapper::match_concept);
+                .def("get_tree_pool_size", &trans_pearl_wrapper::get_tree_pool_size);
 
 }

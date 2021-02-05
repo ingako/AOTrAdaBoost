@@ -38,8 +38,6 @@ public:
     int get_candidate_tree_group_size();
     int get_tree_pool_size();
 
-    void match_concept();
-
 private:
 
     vector<shared_ptr<trans_pearl>> classifiers;
