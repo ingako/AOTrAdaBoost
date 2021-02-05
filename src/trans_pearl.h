@@ -54,8 +54,7 @@ class trans_pearl : public pearl {
         vector<shared_ptr<pearl_tree>>& get_concept_repo();
         void register_tree_pool(vector<shared_ptr<pearl_tree>>& pool);
         bool has_actual_drifted_trees();
-        void match_concept();
-        void transfer();
+        shared_ptr<trans_pearl_tree> match_concept(shared_ptr<trans_pearl_tree> drifted_tree);
 
 private:
 
@@ -80,9 +79,10 @@ private:
         // Transfer
         vector<vector<shared_ptr<pearl_tree>>*> registered_tree_pools;
         vector<int> actual_drifted_trees;
-        vector<double> best_perf_metrics_for_drifted_trees;
-        vector<vector<Instance*>> instance_stores;
-        void evaluate_tree(vector<Instance*> &pseudo_instances);
+        // vector<double> best_perf_metrics_for_drifted_trees;
+        // vector<vector<Instance*>> instance_stores;
+        int evaluate_tree(shared_ptr<trans_pearl_tree> drifted_tree, vector<Instance*> &pseudo_instances);
+        void transfer(vector<int>& actual_drifted_trees);
 
         // ozaboost
         // vector<double> scms;
@@ -109,7 +109,7 @@ private:
 
             // training starts when a mini_batch is ready
             void train(Instance* instance, bool is_same_distribution);
-            shared_ptr<trans_pearl_tree> get_best_model();
+            vector<shared_ptr<pearl_tree>> get_best_models();
             void online_tradaboost(Instance* instance, bool _is_same_distribution, bool force_trigger);
 
             vector<Instance*> warning_period_instances;
