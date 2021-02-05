@@ -536,6 +536,7 @@ void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
         // TODO stopping criteria
         cout << "generating pseudo_instances" << endl;
         vector<Instance*> pseudo_instances = matched_tree->generate_data(instance, 300);
+        bbt_pools[drifted_tree_idx]->is_same_distribution = false;
         for (auto pseudo_instance : pseudo_instances) {
             bbt_pools[drifted_tree_idx]->online_tradaboost(pseudo_instance, false, false);
         }
@@ -842,9 +843,7 @@ void trans_pearl::boosted_bg_tree_pool::boost() {
 
             double weight = instance->getWeight();
             instance->setWeight(k * weight);
-            for (int i = 0; i < k; i++) {
-                tree->train(*instance);
-            }
+            tree->train(*instance);
             instance->setWeight(weight);
 
             // boosting based on out-of-bag errors

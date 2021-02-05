@@ -112,6 +112,8 @@ private:
             vector<shared_ptr<pearl_tree>> get_best_models();
             void online_tradaboost(Instance* instance, bool _is_same_distribution, bool force_trigger);
 
+            // data comes from the same distribution during drift warning period
+            bool is_same_distribution = true;
             vector<Instance*> warning_period_instances;
 
         private:
@@ -126,9 +128,6 @@ private:
             vector<shared_ptr<trans_pearl_tree>> pool;
             vector<int> oob_tree_correct_count; // count of out-of-bag correctly predicted trees per instance
             vector<int> oob_tree_total_count; // count of oob trees per instance
-
-            // data comes from the same distribution during drift warning period
-            bool is_same_distribution = true;
 
             // execute replacement strategies when the bbt pool is full
             void update_bbt();
