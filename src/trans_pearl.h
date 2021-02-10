@@ -79,10 +79,13 @@ private:
         // Transfer
         vector<vector<shared_ptr<pearl_tree>>*> registered_tree_pools;
         vector<int> actual_drifted_trees;
+        vector<int> actual_drifted_trees_bg;
         // vector<double> best_perf_metrics_for_drifted_trees;
         // vector<vector<Instance*>> instance_stores;
         int evaluate_tree(shared_ptr<trans_pearl_tree> drifted_tree, vector<Instance*> &pseudo_instances);
         void transfer(vector<int>& actual_drifted_trees);
+
+    double compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count);
 
         // ozaboost
         // vector<double> scms;
@@ -95,7 +98,7 @@ private:
         int stream_instance_idx = 0;
         vector<int> drift_warning_period_lengths;
 
-        int pool_size = 100;
+        int pool_size = 30;
         int mini_batch_size = 100;
         // one boosted background tree pool per foreground tree
         vector<unique_ptr<boosted_bg_tree_pool>> bbt_pools;
@@ -148,6 +151,8 @@ public:
 
     trans_pearl_tree(trans_pearl_tree const &rhs);
 
+    // 1. For matching a concept by running other trees in other domains on it
+    // 2. For generating data by using KNN
     vector<Instance*> instance_store;
 
     virtual void train(Instance &instance);

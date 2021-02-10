@@ -219,10 +219,8 @@ void trans_pearl::train() {
 
     // if actual drifts are detected, swap trees and update cur_state
     if (drifted_tree_pos_list.size() > 0) {
+        transfer(drifted_tree_pos_list);
         actual_drifted_trees = adapt_state(drifted_tree_pos_list, false);
-        // pearl::adapt_state(drifted_tree_pos_list);
-
-        transfer(actual_drifted_trees);
     }
 }
 
@@ -526,9 +524,19 @@ void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
         if (bbt_pools[drifted_tree_idx]->warning_period_instances.size() < 50) {
             return;
         }
+        // cout << "warning_period_instances size is enough" << endl;
 
-        shared_ptr<trans_pearl_tree> drifted_tree = static_pointer_cast<trans_pearl_tree>(foreground_trees[drifted_tree_idx]);
-        shared_ptr<trans_pearl_tree> matched_tree = match_concept(drifted_tree);
+        shared_ptr<trans_pearl_tree> drifted_trans_pearl_tree =
+                static_pointer_cast<trans_pearl_tree>(foreground_trees[drifted_tree_idx]);
+        shared_ptr<trans_pearl_tree> bg_trans_pearl_tree =
+                static_pointer_cast<trans_pearl_tree>(drifted_trans_pearl_tree->bg_pearl_tree);
+        if (bg_trans_pearl_tree== nullptr) {
+            // cout << "transfer: bg_drifted_tree is nullptr" << endl;
+            return;
+        }
+
+
+        shared_ptr<trans_pearl_tree> matched_tree = match_concept(bg_trans_pearl_tree);
         if (matched_tree == nullptr) {
             continue;
         }
@@ -554,16 +562,38 @@ void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
 }
 
 shared_ptr<trans_pearl_tree> trans_pearl::match_concept(shared_ptr<trans_pearl_tree> drifted_tree) {
+    // TODO: param
+    if (drifted_tree->instance_store.size() < 50) {
+        cout << "match_concept: drifted_tree does not have enough warning_period_instance" << endl;
+        return nullptr;
+    }
+
     shared_ptr<trans_pearl_tree> matched_tree = nullptr;
-    int highest_correct_count = 0;
+    double highest_kappa = 0.0;
+
+    // For kappa calculation
+    int class_count = drifted_tree->instance_store[0]->getNumberClasses();
+    vector<int> true_labels;
+    for (auto warning_period_instance : drifted_tree->instance_store) {
+        true_labels.push_back(warning_period_instance->getLabel());
+    }
 
     for (auto registered_tree_pool : registered_tree_pools) {
         for (auto tree : *registered_tree_pool) {
             shared_ptr<trans_pearl_tree> trans_tree = static_pointer_cast<trans_pearl_tree>(tree);
-            vector<Instance*> generated_data = trans_tree->generate_data(instance, 100);
-            int correct_count = this->evaluate_tree(drifted_tree, generated_data);
-            if (highest_correct_count < correct_count) {
-                highest_correct_count = correct_count;
+
+            vector<int> predicted_labels;
+            for (auto warning_period_instance : drifted_tree->instance_store) {
+                // TODO: reset performance tracking?
+                int prediction = trans_tree->predict(*warning_period_instance, false);
+                predicted_labels.push_back(prediction);
+            }
+
+            // double kappa = trans_tree->update_kappa(true_labels, class_count, true);
+            double kappa = compute_kappa(predicted_labels, true_labels, class_count);
+            // cout << "trans_tree kappa: " << trans_tree->kappa << endl;
+            if (highest_kappa < trans_tree->kappa) {
+                highest_kappa = trans_tree->kappa;
                 matched_tree = trans_tree;
             }
         }
@@ -574,7 +604,51 @@ shared_ptr<trans_pearl_tree> trans_pearl::match_concept(shared_ptr<trans_pearl_t
         return nullptr;
     }
 
+    cout << "match_concept: matched a tree" << endl;
     return matched_tree;
+}
+
+double trans_pearl::compute_kappa(vector<int> predicted_labels,vector<int> actual_labels, int class_count) {
+    // prepare confusion matrix
+    vector<vector<int>> confusion_matrix(class_count, vector<int>(class_count, 0));
+    int correct = 0;
+
+    for (int i = 0; i < predicted_labels.size(); i++) {
+        confusion_matrix[actual_labels[i]][predicted_labels[i]]++;
+        if (actual_labels[i] == predicted_labels[i]) {
+            correct++;
+        }
+    }
+
+    double accuracy = (double) correct / predicted_labels.size();
+
+    // computes the Cohen's kappa coefficient
+    int sample_count = predicted_labels.size();
+    double p0 = accuracy;
+    double pc = 0.0;
+    int row_count = class_count;
+    int col_count = class_count;
+
+
+    for (int i = 0; i < row_count; i++) {
+        double row_sum = 0;
+        for (int j = 0; j < col_count; j++) {
+            row_sum += confusion_matrix[i][j];
+        }
+
+        double col_sum = 0;
+        for (int j = 0; j < row_count; j++) {
+            col_sum += confusion_matrix[j][i];
+        }
+
+        pc += (row_sum / sample_count) * (col_sum / sample_count);
+    }
+
+    if (pc == 1) {
+        return 1;
+    }
+
+    return (p0 - pc) / (1.0 - pc);
 }
 
 int trans_pearl::evaluate_tree(shared_ptr<trans_pearl_tree> drifted_tree, vector<Instance*> &pseudo_instances) {
@@ -649,20 +723,24 @@ trans_pearl_tree::trans_pearl_tree(trans_pearl_tree const &rhs)
                      rhs.mrand) {}
 
 void trans_pearl_tree::train(Instance& instance) {
-    this->instance_store.push_back(&instance);
+    // this->instance_store.push_back(&instance);
     if (this->bg_pearl_tree != nullptr) {
         shared_ptr<trans_pearl_tree> trans_bg_tree;
         trans_bg_tree = static_pointer_cast<trans_pearl_tree>(this->bg_pearl_tree);
         trans_bg_tree->instance_store.push_back(&instance);
     }
 
-    if (this->instance_store.size() > 1000) {
+    if (this->instance_store.size() > 500) {
         this->instance_store.erase(this->instance_store.begin()); // TODO deque
     }
     pearl_tree::train(instance);
 }
 
 vector<Instance*> trans_pearl_tree::generate_data(Instance* instance, int num_instances) {
+    if (this->instance_store.size() < 10) {
+        cout << "generate_data: not enough warning period data " << this->instance_store.size() << endl;
+        return vector<Instance*>();
+    }
     // shared_ptr<trans_pearl_tree> tree = static_pointer_cast<trans_pearl_tree>(tree_pool[tree_idx]);
     vector<Instance*> pseudo_instances;
 
