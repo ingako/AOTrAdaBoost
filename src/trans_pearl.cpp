@@ -507,24 +507,24 @@ bool trans_pearl::has_actual_drifted_trees() {
 void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
     // For each actual drifted trees
     // 1. Concept Matching
-    // 2. Generate pseudo data for current drifted trees to match
-    // 3. Boosting
-    // 4. Evaluate on warning period data
-    // 5. Replace candidate trees (which replaced actual drifted trees)
+    // 2. Boosting
+    // 3. Evaluate on warning period data
+    // 4. Replace candidate trees (which replaced actual drifted trees)
 
     deque<shared_ptr<pearl_tree>> transfer_trees;
 
     for (auto drifted_tree_idx : actual_drifted_trees) {
         if (bbt_pools[drifted_tree_idx] == nullptr) {
-            cout << "transfer: bbt_pools does not exist for an actual drifted tree"  << endl;
-            exit(1);
+            // cout << "transfer: bbt_pool does not exist for an actual drifted tree"  << endl;
+            // exit(1);
+            return;
         }
 
         // TODO input param
         if (bbt_pools[drifted_tree_idx]->warning_period_instances.size() < 50) {
+            // cout << "warning_period_instances size is not enough" << endl;
             return;
         }
-        // cout << "warning_period_instances size is enough" << endl;
 
         shared_ptr<trans_pearl_tree> drifted_trans_pearl_tree =
                 static_pointer_cast<trans_pearl_tree>(foreground_trees[drifted_tree_idx]);
@@ -542,7 +542,7 @@ void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
         }
 
         // TODO stopping criteria
-        cout << "generating pseudo_instances" << endl;
+        // cout << "generating pseudo_instances" << endl;
         vector<Instance*> pseudo_instances = matched_tree->generate_data(instance, 300);
         bbt_pools[drifted_tree_idx]->is_same_distribution = false;
         for (auto pseudo_instance : pseudo_instances) {
@@ -600,7 +600,7 @@ shared_ptr<trans_pearl_tree> trans_pearl::match_concept(shared_ptr<trans_pearl_t
     }
 
     if (matched_tree == nullptr) {
-        cout << "match_concept: failed to match a tree" << endl;
+        // cout << "match_concept: failed to match a tree" << endl;
         return nullptr;
     }
 
@@ -723,11 +723,14 @@ trans_pearl_tree::trans_pearl_tree(trans_pearl_tree const &rhs)
                      rhs.mrand) {}
 
 void trans_pearl_tree::train(Instance& instance) {
-    // this->instance_store.push_back(&instance);
+    this->instance_store.push_back(&instance); // for generate_data
     if (this->bg_pearl_tree != nullptr) {
         shared_ptr<trans_pearl_tree> trans_bg_tree;
         trans_bg_tree = static_pointer_cast<trans_pearl_tree>(this->bg_pearl_tree);
         trans_bg_tree->instance_store.push_back(&instance);
+        if (trans_bg_tree->instance_store.size() > 500) {
+            trans_bg_tree->instance_store.erase(trans_bg_tree->instance_store.begin()); // TODO deque
+        }
     }
 
     if (this->instance_store.size() > 500) {
@@ -741,6 +744,7 @@ vector<Instance*> trans_pearl_tree::generate_data(Instance* instance, int num_in
         cout << "generate_data: not enough warning period data " << this->instance_store.size() << endl;
         return vector<Instance*>();
     }
+    cout << "generate_data..." << this->instance_store.size() << endl;
     // shared_ptr<trans_pearl_tree> tree = static_pointer_cast<trans_pearl_tree>(tree_pool[tree_idx]);
     vector<Instance*> pseudo_instances;
 
