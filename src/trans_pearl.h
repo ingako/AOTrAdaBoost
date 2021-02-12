@@ -46,10 +46,10 @@ class trans_pearl : public pearl {
 
         void select_predicted_trees(const vector<int>& warning_tree_pos_list);
 
-        vector<int> adapt_state(const vector<int>& drifted_tree_pos_list, bool is_proactive);
-        vector<int> adapt_state_with_proactivity(
+        vector<int> adapt_state(
                 const vector<int>& drifted_tree_pos_list,
-                deque<shared_ptr<pearl_tree>>& _candidate_trees);
+                deque<shared_ptr<pearl_tree>>& _candidate_trees,
+                bool is_transferred_tree);
 
         vector<shared_ptr<pearl_tree>>& get_concept_repo();
         void register_tree_pool(vector<shared_ptr<pearl_tree>>& pool);

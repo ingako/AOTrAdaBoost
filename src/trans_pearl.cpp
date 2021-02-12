@@ -220,7 +220,7 @@ void trans_pearl::train() {
     // if actual drifts are detected, swap trees and update cur_state
     if (drifted_tree_pos_list.size() > 0) {
         transfer(drifted_tree_pos_list);
-        actual_drifted_trees = adapt_state(drifted_tree_pos_list, false);
+        actual_drifted_trees = adapt_state(drifted_tree_pos_list, candidate_trees, false);
     }
 }
 
@@ -269,18 +269,8 @@ void trans_pearl::update_drifted_tree_indices(const vector<int>& tree_indices) {
 
 vector<int> trans_pearl::adapt_state(
         const vector<int>& drifted_tree_pos_list,
-        bool is_proactive) {
-
-    if (is_proactive) {
-        return adapt_state_with_proactivity(drifted_tree_pos_list, predicted_trees);
-    } else {
-        return adapt_state_with_proactivity(drifted_tree_pos_list, candidate_trees);
-    }
-}
-
-vector<int> trans_pearl::adapt_state_with_proactivity(
-        const vector<int>& drifted_tree_pos_list,
-        deque<shared_ptr<pearl_tree>>& _candidate_trees) {
+        deque<shared_ptr<pearl_tree>>& _candidate_trees,
+        bool is_transferred_tree) {
 
     vector<int> actual_drifted_tree_indices; // for return
 
@@ -329,7 +319,7 @@ vector<int> trans_pearl::adapt_state_with_proactivity(
 
         }
 
-        if (swap_tree == nullptr) {
+        if (swap_tree == nullptr && !is_transferred_tree) {
             add_to_repo = true;
 
             if (enable_state_graph) {
@@ -378,11 +368,22 @@ vector<int> trans_pearl::adapt_state_with_proactivity(
         }
 
         if (!swap_tree) {
-            LOG("swap_tree is nullptr");
+            if (is_transferred_tree) {
+                continue;
+            }
+            LOG("adapt state with transferred trees: swap_tree is nullptr");
             exit(1);
         }
 
         if (enable_state_graph) {
+            if (swap_tree->tree_pool_id == -1) {
+                if (!is_transferred_tree) {
+                    LOG("non transferred swap tree does not have a tree_pool_id");
+                    exit(1);
+                }
+                swap_tree->tree_pool_id = tree_pool.size();
+                tree_pool.push_back(swap_tree);
+            }
             state_graph->add_edge(drifted_tree->tree_pool_id, swap_tree->tree_pool_id);
         }
 
@@ -557,7 +558,7 @@ void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
 
     if (transfer_trees.size() > 0) {
         cout << "adapting state - size of transfer_trees: " << transfer_trees.size() << endl;
-        adapt_state_with_proactivity(actual_drifted_trees, transfer_trees);
+        adapt_state(actual_drifted_trees, transfer_trees, true);
     }
 }
 
@@ -604,7 +605,7 @@ shared_ptr<trans_pearl_tree> trans_pearl::match_concept(shared_ptr<trans_pearl_t
         return nullptr;
     }
 
-    cout << "match_concept: matched a tree" << endl;
+    // cout << "match_concept: matched a tree" << endl;
     return matched_tree;
 }
 
@@ -744,8 +745,8 @@ vector<Instance*> trans_pearl_tree::generate_data(Instance* instance, int num_in
         cout << "generate_data: not enough warning period data " << this->instance_store.size() << endl;
         return vector<Instance*>();
     }
-    cout << "generate_data..." << this->instance_store.size() << endl;
-    // shared_ptr<trans_pearl_tree> tree = static_pointer_cast<trans_pearl_tree>(tree_pool[tree_idx]);
+
+    // cout << "generate_data..." << this->instance_store.size() << endl;
     vector<Instance*> pseudo_instances;
 
     for (int i = 0; i < num_instances; i++) {
