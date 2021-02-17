@@ -77,11 +77,16 @@ if __name__ == '__main__':
                         dest="generator_name", default="agrawal", type=str,
                         help="name of the synthetic data generator")
     parser.add_argument("--generator_traits",
-                        dest="generator_traits", default="abrupt/0", type=str,
+                        dest="generator_traits", default="abrupt/poisson3", type=str,
                         help="Traits of the synthetic data")
     parser.add_argument("--generator_seed",
                         dest="generator_seed", default=0, type=int,
                         help="Seed used for generating synthetic data")
+
+    # transfer learning params
+    parser.add_argument("--transfer_streams",
+                        dest="transfer_streams", default="", type=str,
+                        help="stream prefix for transfer learning")
 
     # pearl params
     parser.add_argument("-t", "--tree",
@@ -163,9 +168,20 @@ if __name__ == '__main__':
 
     # prepare data
     if args.is_generated_data:
-        data_file_dir = f"../data/{args.generator_name}/" \
+        data_file_dir = f"data/{args.generator_name}/" \
                         f"{args.generator_traits}/"
-        data_file_path = f"{data_file_dir}/{args.generator_seed}.{args.data_format}"
+
+        data_file_path = ""
+        if args.transfer:
+            for seed in args.transfer_streams.split(";"):
+                print(f"seed: {seed}")
+                data_file_path += f"{data_file_dir}/{seed}.{args.data_format};"
+            data_file_path = data_file_path[:-1]
+            print(f"data_file_path: {data_file_path}")
+            # e.g /root/transfer/data/agrawal/abrupt/0.arff;/root/transfer/data/agrawal/abrupt/0.arff"
+
+        else:
+            data_file_path = f"{data_file_dir}/{args.generator_seed}.{args.data_format}"
         result_directory = f"{args.generator_name}/{args.generator_traits}/"
 
     else:
@@ -173,8 +189,6 @@ if __name__ == '__main__':
                          f"{args.dataset_name}/"
         data_file_path = f"{data_file_dir}/{args.dataset_name}.{args.data_format}"
         result_directory = args.dataset_name
-    # TODO
-    data_file_path = "/home/oceanwu/git/transfer/data/agrawal/abrupt/0.arff;/home/oceanwu/git/transfer/data/agrawal/abrupt/0.arff"
 
     for file_path in data_file_path.split(";"):
         if not os.path.isfile(file_path):
@@ -196,7 +210,7 @@ if __name__ == '__main__':
                            f"k{args.cd_kappa_threshold}-e{args.edit_distance_threshold}/"
 
     if args.transfer:
-        result_directory = f"{result_directory}/nacre/" \
+        result_directory = f"{result_directory}/transfer/" \
                            f"{args.sequence_len}/{args.backtrack_window}/" \
                            f"{args.pro_drift_window}/{args.stability_delta}/{args.hybrid_delta}"
 
@@ -254,13 +268,12 @@ if __name__ == '__main__':
         # for calculating acc per drift
         expected_drift_locs = deque()
         expected_drift_locs_log = f"{data_file_dir}/drift-{args.generator_seed}.log"
-        # TODO
-        expected_drift_locs_log = "/home/oceanwu/git/transfer/data/agrawal/abrupt/drift-0.log"
         with open(f"{expected_drift_locs_log}", 'r') as f:
             for line in f:
                 expected_drift_locs.append(int(line))
+
     if args.transfer:
-        stream_sequences_file_path = "/home/oceanwu/git/transfer/data/agrawal/abrupt/sequence.txt"
+        stream_sequences_file_path = f"{data_file_dir}/sequence.txt"
 
 
     if not args.enable_state_adaption and not args.enable_state_graph:
@@ -288,6 +301,15 @@ if __name__ == '__main__':
             with open(f"{stream_sequences_file_path}", 'r') as f:
                 for line in f:
                     stream_sequences.append([int(v) for v in line.split()])
+
+            metrics_loggers = []
+            for idx in range(len(data_file_path.split(";"))):
+                metric_output_file = f"{result_directory}/" \
+                                     f"result-{args.generator_seed}-stream-{idx}.csv"
+                print(metric_output_file)
+                metrics_logger = setup_logger(f'metrics-{idx}', metric_output_file)
+                metrics_logger.info("count,accuracy,kappa,candidate_tree_size,tree_pool_size,time")
+                metrics_loggers.append(metrics_logger)
 
             classifier = trans_pearl_wrapper(len(data_file_path.split(";")),
                                              args.num_trees,
@@ -317,7 +339,7 @@ if __name__ == '__main__':
                 data_file_paths=data_file_path.split(";"),
                 max_samples=args.max_samples,
                 sample_freq=args.sample_freq,
-                metrics_logger=metrics_logger,
+                metrics_loggers=metrics_loggers,
                 seq_logger=seq_logger,
                 expected_drift_locs=expected_drift_locs,
                 acc_per_drift_logger=acc_per_drift_logger,

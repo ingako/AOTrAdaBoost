@@ -36,7 +36,7 @@ class Evaluator:
                     data_file_paths,
                     max_samples,
                     sample_freq,
-                    metrics_logger,
+                    metrics_loggers,
                     seq_logger,
                     expected_drift_locs,
                     acc_per_drift_logger,
@@ -54,7 +54,7 @@ class Evaluator:
         classifier_metrics_list[classifier_idx].start_time = time.process_time()
 
         # for count in range(0, max_samples):
-        for count in range(0, 100000):
+        for count in range(0, 40000):
             # TODO
             if count == switch_location and len(stream_sequences) > 0:
                 # Switch streams to simulate parallel streams
@@ -66,6 +66,7 @@ class Evaluator:
                 metric = classifier_metrics_list[classifier_idx]
                 metric.start_time = time.process_time()
 
+                print()
                 print(f"switching to classifier_idx {classifier_idx}")
 
             if not classifier.get_next_instance():
@@ -97,7 +98,7 @@ class Evaluator:
             #     self._transfer(classifier)
 
             # classifier.delete_cur_instance()
-            self._log_metrics(classifier_metrics_list[classifier_idx].instance_idx, sample_freq, metric, classifier, metrics_logger)
+            self._log_metrics(classifier_metrics_list[classifier_idx].instance_idx, sample_freq, metric, classifier, metrics_loggers[classifier_idx])
 
     def _log_metrics(self, count, sample_freq, metric, classifier, metrics_logger):
         if count % sample_freq == 0 and count != 0:
@@ -111,7 +112,7 @@ class Evaluator:
 
             # TODO multiple output streams
             print(f"{count},{accuracy},{kappa},{candidate_tree_size},{tree_pool_size},{elapsed_time}")
-            metrics_logger.info(f"{count},{accuracy},{kappa}," \
+            metrics_logger.info(f"{count},{accuracy},{kappa},"
                                 f"{candidate_tree_size},{tree_pool_size},{elapsed_time}")
 
             metric.correct = 0
