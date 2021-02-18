@@ -29,10 +29,12 @@ class trans_pearl : public pearl {
                   double reuse_rate_upper_bound,
                   double warning_delta,
                   double drift_delta,
-                  int pro_drift_window_size,
-                  double hybrid_delta,
-                  int backtrack_window,
-                  double stability_delta);
+                  int least_transfer_warning_period_instances_length,
+                  int instance_store_size,
+                  int num_pseudo_instances,
+                  int bbt_pool_size,
+                  int mini_batch_size);
+
 
         virtual void train();
         virtual shared_ptr<pearl_tree> make_pearl_tree(int tree_pool_id);
@@ -58,12 +60,6 @@ class trans_pearl : public pearl {
 
 private:
 
-        int pro_drift_window_size = 100;
-        double hybrid_delta = 0.001;
-        int backtrack_window = 25;
-        double stability_delta = 0.001;
-
-        int num_max_backtrack_instances = 100000000; // TODO
         int num_instances_seen = 0;
         deque<Instance*> backtrack_instances;
         set<int> potential_drifted_tree_indices;
@@ -85,7 +81,7 @@ private:
         int evaluate_tree(shared_ptr<trans_pearl_tree> drifted_tree, vector<Instance*> &pseudo_instances);
         void transfer(vector<int>& actual_drifted_trees);
 
-    double compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count);
+        double compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count);
 
         // ozaboost
         // vector<double> scms;
@@ -98,7 +94,10 @@ private:
         int stream_instance_idx = 0;
         vector<int> drift_warning_period_lengths;
 
-        int pool_size = 30;
+        int least_transfer_warning_period_length = 50; // int pro_drift_window_size = 100;
+        int instance_store_size = 500; // double hybrid_delta = 0.001;
+        int num_pseudo_instances = 300; // int backtrack_window = 25;
+        int bbt_pool_size = 100;
         int mini_batch_size = 100;
         // one boosted background tree pool per foreground tree
         vector<unique_ptr<boosted_bg_tree_pool>> bbt_pools;
@@ -143,17 +142,17 @@ class trans_pearl_tree : public pearl_tree {
 public:
     trans_pearl_tree(int tree_pool_id,
                      int kappa_window_size,
-                     int pro_drift_window_size,
                      double warning_delta,
                      double drift_delta,
-                     double hybrid_delta,
-                     std::mt19937 mrand);
+                     std::mt19937 mrand,
+                     int instance_store_size);
 
     trans_pearl_tree(trans_pearl_tree const &rhs);
 
     // 1. For matching a concept by running other trees in other domains on it
     // 2. For generating data by using KNN
     vector<Instance*> instance_store;
+    int instance_store_size;
 
     virtual void train(Instance &instance);
 

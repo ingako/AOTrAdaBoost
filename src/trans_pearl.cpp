@@ -1,24 +1,26 @@
 #include "trans_pearl.h"
 
 trans_pearl::trans_pearl(int num_trees,
-                     int max_num_candidate_trees,
-                     int repo_size,
-                     int edit_distance_threshold,
-                     int kappa_window_size,
-                     int lossy_window_size,
-                     int reuse_window_size,
-                     int arf_max_features,
-                     int lambda,
-                     int seed,
-                     double bg_kappa_threshold,
-                     double cd_kappa_threshold,
-                     double reuse_rate_upper_bound,
-                     double warning_delta,
-                     double drift_delta,
-                     int pro_drift_window_size,
-                     double hybrid_delta,
-                     int backtrack_window,
-                     double stability_delta):
+                         int max_num_candidate_trees,
+                         int repo_size,
+                         int edit_distance_threshold,
+                         int kappa_window_size,
+                         int lossy_window_size,
+                         int reuse_window_size,
+                         int arf_max_features,
+                         int lambda,
+                         int seed,
+                         double bg_kappa_threshold,
+                         double cd_kappa_threshold,
+                         double reuse_rate_upper_bound,
+                         double warning_delta,
+                         double drift_delta,
+                         // transfer learning params
+                         int least_transfer_warning_period_instances_length,
+                         int instance_store_size,
+                         int num_pseudo_instances,
+                         int bbt_pool_size,
+                         int mini_batch_size):
         pearl(num_trees,
               max_num_candidate_trees,
               repo_size,
@@ -36,10 +38,11 @@ trans_pearl::trans_pearl(int num_trees,
               drift_delta,
               true,
               true),
-        pro_drift_window_size(pro_drift_window_size),
-        hybrid_delta(hybrid_delta),
-        backtrack_window(backtrack_window),
-        stability_delta(stability_delta) {
+        least_transfer_warning_period_length(least_transfer_warning_period_instances_length), // 50 pro_drift_window_size(pro_drift_window_size),
+        instance_store_size(instance_store_size),
+        num_pseudo_instances(num_pseudo_instances),
+        bbt_pool_size(bbt_pool_size),
+        mini_batch_size(mini_batch_size) {
 
 }
 
@@ -65,11 +68,10 @@ void trans_pearl::init() {
 shared_ptr<pearl_tree> trans_pearl::make_pearl_tree(int tree_pool_id) {
     return make_shared<trans_pearl_tree>(tree_pool_id,
                                          kappa_window_size,
-                                         pro_drift_window_size,
                                          warning_delta,
                                          drift_delta,
-                                         hybrid_delta,
-                                         mrand);
+                                         mrand,
+                                         instance_store_size);
 }
 
 // foreground trees make predictions, update votes, keep track of actual labels
@@ -83,7 +85,7 @@ void trans_pearl::train() {
     if (drift_warning_period_lengths.size() == 0) {
         drift_warning_period_lengths.resize(num_trees, 0);
     }
-    if (stream_instance_idx == 90000) {
+    if (stream_instance_idx == 25000) {
         cout << "drift_warning_distance: " << endl;
         for (int i = 0; i < num_trees; i++) {
             cout << drift_warning_period_lengths[i] << " ";
@@ -158,7 +160,7 @@ void trans_pearl::train() {
 
             shared_ptr<trans_pearl_tree> tree_template
                     = static_pointer_cast<trans_pearl_tree>(cur_tree->bg_pearl_tree);
-            bbt_pools[i] = make_unique<boosted_bg_tree_pool>(100, 100, tree_template, this->lambda);
+            bbt_pools[i] = make_unique<boosted_bg_tree_pool>(bbt_pool_size, mini_batch_size, tree_template, this->lambda);
         }
 
         // detect drift
@@ -180,12 +182,12 @@ void trans_pearl::train() {
         }
 
         // detect stability
-        int correct_count = (int) (actual_label == predicted_label);
-        if (cur_tree->replaced_tree
-            && detect_stability(correct_count, stability_detectors[i])) {
-            stability_detectors[i] = make_unique<HT::ADWIN>(stability_delta);
-            stable_tree_indices.push_back(i);
-        }
+        // int correct_count = (int) (actual_label == predicted_label);
+        // if (cur_tree->replaced_tree
+        //     && detect_stability(correct_count, stability_detectors[i])) {
+        //     stability_detectors[i] = make_unique<HT::ADWIN>(stability_delta);
+        //     stable_tree_indices.push_back(i);
+        // }
 
         if (bbt_pools[i] != nullptr) {
             // Add instance to mini-batch. Boosting auto triggers when the mini-batch is full.
@@ -282,6 +284,18 @@ vector<int> trans_pearl::adapt_state(
     }
     sort(_candidate_trees.begin(), _candidate_trees.end(), compare_kappa);
 
+    if (is_transferred_tree) {
+        cout << "kappa: ";
+        for (int i = 0; i < _candidate_trees.size(); i++) {
+            cout << _candidate_trees[i]->kappa << " ";
+            if (_candidate_trees[i]->kappa < 0.1) {
+                _candidate_trees.pop_front();
+            }
+        }
+        cout << endl;
+
+    }
+
     for (int i = 0; i < drifted_tree_pos_list.size(); i++) {
         // TODO
         if (tree_pool.size() >= repo_size) {
@@ -375,6 +389,11 @@ vector<int> trans_pearl::adapt_state(
             exit(1);
         }
 
+        if (is_transferred_tree) {
+            cout << "swapping with transfered_tree------------------" << endl;
+            cout << swap_tree->kappa << endl;
+        }
+
         if (enable_state_graph) {
             if (swap_tree->tree_pool_id == -1) {
                 if (!is_transferred_tree) {
@@ -405,61 +424,6 @@ vector<int> trans_pearl::adapt_state(
     }
 
     return actual_drifted_tree_indices;
-}
-
-int trans_pearl::find_last_actual_drift_point(int tree_idx) {
-    if (backtrack_instances.size() > num_max_backtrack_instances) {
-        LOG("backtrack_instances has too many data instance");
-        exit(1);
-    }
-
-    shared_ptr<pearl_tree> swapped_tree;
-    swapped_tree = static_pointer_cast<pearl_tree>(foreground_trees[tree_idx]);
-    shared_ptr<pearl_tree> drifted_tree = swapped_tree->replaced_tree;
-    swapped_tree->replaced_tree = nullptr;
-
-    if (!drifted_tree || !swapped_tree) {
-        cout << "Empty drifted or swapped tree" << endl;
-        return -1;
-    }
-
-    int drift_correct = 0;
-    int swap_correct = 0;
-    double drifted_tree_accuracy = 0.0;
-    double swapped_tree_accuracy = 0.0;
-
-    deque<int> drifted_tree_predictions;
-    deque<int> swapped_tree_predictions;
-
-    for (int i = backtrack_instances.size() - 1; i >= 0; i--) {
-        if (!backtrack_instances[i]) {
-            LOG("cur instance is null!");
-            exit(1);
-        }
-
-        int drift_predicted_label = drifted_tree->predict(*backtrack_instances[i], false);
-        int swap_predicted_label = swapped_tree->predict(*backtrack_instances[i], false);
-
-        int actual_label = instance->getLabel();
-        drifted_tree_predictions.push_back((int) (drift_predicted_label == actual_label));
-        swapped_tree_predictions.push_back((int) (swap_predicted_label == actual_label));
-
-        drift_correct += drifted_tree_predictions.back();
-        swap_correct += swapped_tree_predictions.back();
-
-        if (drifted_tree_predictions.size() >= backtrack_window) {
-            drift_correct -= drifted_tree_predictions.front();
-            swap_correct -= swapped_tree_predictions.front();
-            drifted_tree_predictions.pop_front();
-            swapped_tree_predictions.pop_front();
-
-            if (drift_correct >= swap_correct) {
-                return backtrack_instances.size() - i;
-            }
-        }
-    }
-
-    return -1;
 }
 
 void trans_pearl::set_expected_drift_prob(int tree_idx, double p) {
@@ -521,8 +485,7 @@ void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
             return;
         }
 
-        // TODO input param
-        if (bbt_pools[drifted_tree_idx]->warning_period_instances.size() < 50) {
+        if (bbt_pools[drifted_tree_idx]->warning_period_instances.size() < least_transfer_warning_period_length) {
             // cout << "warning_period_instances size is not enough" << endl;
             return;
         }
@@ -544,7 +507,7 @@ void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
 
         // TODO stopping criteria
         // cout << "generating pseudo_instances" << endl;
-        vector<Instance*> pseudo_instances = matched_tree->generate_data(instance, 300);
+        vector<Instance*> pseudo_instances = matched_tree->generate_data(instance, num_pseudo_instances);
         bbt_pools[drifted_tree_idx]->is_same_distribution = false;
         for (auto pseudo_instance : pseudo_instances) {
             bbt_pools[drifted_tree_idx]->online_tradaboost(pseudo_instance, false, false);
@@ -563,8 +526,7 @@ void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
 }
 
 shared_ptr<trans_pearl_tree> trans_pearl::match_concept(shared_ptr<trans_pearl_tree> drifted_tree) {
-    // TODO: param
-    if (drifted_tree->instance_store.size() < 50) {
+    if (drifted_tree->instance_store.size() < least_transfer_warning_period_length) {
         cout << "match_concept: drifted_tree does not have enough warning_period_instance" << endl;
         return nullptr;
     }
@@ -609,7 +571,7 @@ shared_ptr<trans_pearl_tree> trans_pearl::match_concept(shared_ptr<trans_pearl_t
     return matched_tree;
 }
 
-double trans_pearl::compute_kappa(vector<int> predicted_labels,vector<int> actual_labels, int class_count) {
+double trans_pearl::compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count) {
     // prepare confusion matrix
     vector<vector<int>> confusion_matrix(class_count, vector<int>(class_count, 0));
     int correct = 0;
@@ -701,27 +663,24 @@ vector<shared_ptr<pearl_tree>>& trans_pearl::get_concept_repo() {
 // class trans_pearl_tree
 trans_pearl_tree::trans_pearl_tree(int tree_pool_id,
                                    int kappa_window_size,
-                                   int pro_drift_window_size,
                                    double warning_delta,
                                    double drift_delta,
-                                   double hybrid_delta,
-                                   std::mt19937 mrand)
+                                   std::mt19937 mrand,
+                                   int instance_store_size)
         : pearl_tree(tree_pool_id,
                      kappa_window_size,
-                     pro_drift_window_size,
                      warning_delta,
                      drift_delta,
-                     hybrid_delta,
-                     mrand) {}
+                     mrand),
+         instance_store_size(instance_store_size) {}
 
 trans_pearl_tree::trans_pearl_tree(trans_pearl_tree const &rhs)
         : pearl_tree(rhs.tree_pool_id,
                      rhs.kappa_window_size,
-                     rhs.pro_drift_window_size,
                      rhs.warning_delta,
                      rhs.drift_delta,
-                     rhs.hybrid_delta,
-                     rhs.mrand) {}
+                     rhs.mrand),
+          instance_store_size(instance_store_size) {}
 
 void trans_pearl_tree::train(Instance& instance) {
     this->instance_store.push_back(&instance); // for generate_data
@@ -729,7 +688,7 @@ void trans_pearl_tree::train(Instance& instance) {
         shared_ptr<trans_pearl_tree> trans_bg_tree;
         trans_bg_tree = static_pointer_cast<trans_pearl_tree>(this->bg_pearl_tree);
         trans_bg_tree->instance_store.push_back(&instance);
-        if (trans_bg_tree->instance_store.size() > 500) {
+        if (trans_bg_tree->instance_store.size() > this->instance_store_size) {
             trans_bg_tree->instance_store.erase(trans_bg_tree->instance_store.begin()); // TODO deque
         }
     }
@@ -911,9 +870,11 @@ void trans_pearl::boosted_bg_tree_pool::update_bbt() {
 
 void trans_pearl::boosted_bg_tree_pool::boost() {
     for (Instance* instance : mini_batch) {
-        double weight = 1.0 / mini_batch.size();
+        double weight = 1.0;
         instance->setWeight(weight);
     }
+
+    vector<int> lambdas(mini_batch_size, lambda);
 
     double z = 0;
     for (auto tree : pool) {
@@ -921,7 +882,7 @@ void trans_pearl::boosted_bg_tree_pool::boost() {
             Instance* instance = mini_batch[i];
 
             // bagging
-            std::poisson_distribution<int> poisson_distr(lambda);
+            std::poisson_distribution<int> poisson_distr(lambdas[i]);
             int k = poisson_distr(mrand);
 
             double weight = instance->getWeight();
@@ -939,16 +900,16 @@ void trans_pearl::boosted_bg_tree_pool::boost() {
                 double c = oob_tree_correct_count[i]
                                 / oob_tree_total_count[i];
                 if (is_same_distribution) {
-                    instance->setWeight(1 - c);
+                    lambdas[i] = 1 - c;
                 } else {
-                    instance->setWeight(c);
+                    lambdas[i] = c;
                 }
             }
-            z += instance->getWeight();
+            z += lambdas[i];
         }
 
-        for (Instance* instance : mini_batch) {
-            instance->setWeight(instance->getWeight() / z);
+        for (int i = 0; i < mini_batch.size(); i++) {
+            lambdas[i] = lambdas[i] / z;
         }
     }
 }

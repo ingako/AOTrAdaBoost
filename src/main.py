@@ -38,27 +38,29 @@ def setup_logger(name, log_file, level=logging.INFO):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    # propearl specific params
+    # transfer learning params
     parser.add_argument("--transfer",
                         dest="transfer", action="store_true",
                         help="Enable ProPearl")
     parser.set_defaults(transfer=False)
-    parser.add_argument("--pro_drift_window",
-                        dest="pro_drift_window", default=100, type=int,
-                        help="number of instances must be seen for proactive drift \
-                        adaption")
-    parser.add_argument("--hybrid",
-                        dest="hybrid_delta", default=0.001, type=float,
-                        help="delta value for proactive hybrid hoeffding bound")
-    parser.add_argument("--backtrack_window",
-                        dest="backtrack_window", default=25, type=int,
-                        help="number of instances per eval when backtracking")
-    parser.add_argument("--stability",
-                        dest="stability_delta", default=0.001, type=float,
-                        help="delta value for detecting stability")
-    parser.add_argument("--sequence_len",
-                        dest="sequence_len", default=8, type=int,
-                        help="sequence length for sequence predictor")
+    parser.add_argument("--transfer_streams",
+                        dest="transfer_streams", default="", type=str,
+                        help="stream prefix for transfer learning")
+    parser.add_argument("--least_transfer_warning_period_instances_length",
+                        dest="least_transfer_warning_period_instances_length", default=50, type=int,
+                        help="The least number of warning period instances needed to perform transfer learning")
+    parser.add_argument("--instance_store_size",
+                        dest="instance_store_size", default=500, type=int,
+                        help="Number of instances stored in each tree for generating pseudo data with KNN")
+    parser.add_argument("--num_pseudo_instances",
+                        dest="num_pseudo_instances", default=300, type=int,
+                        help="number of pseudo instances to generate for transfer learning")
+    parser.add_argument("--bbt_pool_size",
+                        dest="bbt_pool_size", default=100, type=int,
+                        help="The size of the background boosting tree pool")
+    parser.add_argument("--mini_batch_size",
+                        dest="mini_batch_size", default=100, type=int,
+                        help="Batch size of instances for boosting")
 
     # real world datasets
     parser.add_argument("--dataset_name",
@@ -82,11 +84,6 @@ if __name__ == '__main__':
     parser.add_argument("--generator_seed",
                         dest="generator_seed", default=0, type=int,
                         help="Seed used for generating synthetic data")
-
-    # transfer learning params
-    parser.add_argument("--transfer_streams",
-                        dest="transfer_streams", default="", type=str,
-                        help="stream prefix for transfer learning")
 
     # pearl params
     parser.add_argument("-t", "--tree",
@@ -211,8 +208,8 @@ if __name__ == '__main__':
 
     if args.transfer:
         result_directory = f"{result_directory}/transfer/" \
-                           f"{args.sequence_len}/{args.backtrack_window}/" \
-                           f"{args.pro_drift_window}/{args.stability_delta}/{args.hybrid_delta}"
+                           f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
+                           f"{args.num_pseudo_instances}/{args.bbt_pool_size}/{args.mini_batch_size}"
 
     pathlib.Path(result_directory).mkdir(parents=True, exist_ok=True)
 
@@ -327,10 +324,11 @@ if __name__ == '__main__':
                                              args.reuse_rate_upper_bound,
                                              args.warning_delta,
                                              args.drift_delta,
-                                             args.pro_drift_window,
-                                             args.hybrid_delta,
-                                             args.backtrack_window,
-                                             args.stability_delta)
+                                             args.least_transfer_warning_period_instances_length,
+                                             args.instance_store_size,
+                                             args.num_pseudo_instances,
+                                             args.bbt_pool_size,
+                                             args.mini_batch_size)
 
             # all_predicted_drift_locs, accepted_predicted_drift_locs = \
             evaluator = Evaluator()

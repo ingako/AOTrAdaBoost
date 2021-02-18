@@ -22,10 +22,11 @@ public:
                         double reuse_rate_upper_bound,
                         double warning_delta,
                         double drift_delta,
-                        int pro_drift_window_size,
-                        double hybrid_delta,
-                        int backtrack_window,
-                        double stability_delta);
+                        int least_transfer_warning_period_instances_length,
+                        int instance_store_size,
+                        int num_pseudo_instances,
+                        int bbt_pool_size,
+                        int mini_batch_size);
 
     void switch_classifier(int classifier_idx);
 

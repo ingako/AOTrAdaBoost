@@ -18,12 +18,13 @@ trans_pearl_wrapper::trans_pearl_wrapper(
                     double reuse_rate_upper_bound,
                     double warning_delta,
                     double drift_delta,
-                    int pro_drift_window_size,
-                    double hybrid_delta,
-                    int backtrack_window,
-                    double stability_delta) {
+                    int least_transfer_warning_period_instances_length,
+                    int instance_store_size,
+                    int num_pseudo_instances,
+                    int bbt_pool_size,
+                    int mini_batch_size) {
 
-    for (int i = 0; i < num_classifiers; i++) {
+for (int i = 0; i < num_classifiers; i++) {
         shared_ptr<trans_pearl> classifier = make_shared<trans_pearl>(
                 num_trees,
                 max_num_candidate_trees,
@@ -40,10 +41,13 @@ trans_pearl_wrapper::trans_pearl_wrapper(
                 reuse_rate_upper_bound,
                 warning_delta,
                 drift_delta,
-                pro_drift_window_size,
-                hybrid_delta,
-                backtrack_window,
-                stability_delta);
+                least_transfer_warning_period_instances_length,
+                instance_store_size,
+                num_pseudo_instances,
+                bbt_pool_size,
+                mini_batch_size);
+
+
         classifiers.push_back(classifier);
     }
 
