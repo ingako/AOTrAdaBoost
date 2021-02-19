@@ -37,6 +37,7 @@ public:
     bool get_next_instance();
     bool has_actual_drifted_trees();
     int get_candidate_tree_group_size();
+    int get_transferred_tree_group_size();
     int get_tree_pool_size();
 
 private:

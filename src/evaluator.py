@@ -54,7 +54,7 @@ class Evaluator:
         classifier_metrics_list[classifier_idx].start_time = time.process_time()
 
         # for count in range(0, max_samples):
-        for count in range(0, 40000):
+        for count in range(0, 61000):
             # TODO
             if count == switch_location and len(stream_sequences) > 0:
                 # Switch streams to simulate parallel streams
@@ -108,12 +108,15 @@ class Evaluator:
                                       metric.window_predicted_labels)
 
             candidate_tree_size = classifier.get_candidate_tree_group_size()
+            transferred_tree_size = classifier.get_transferred_tree_group_size()
             tree_pool_size = classifier.get_tree_pool_size()
 
             # TODO multiple output streams
-            print(f"{count},{accuracy},{kappa},{candidate_tree_size},{tree_pool_size},{elapsed_time}")
+            print(f"{count},{accuracy},{kappa},{candidate_tree_size},{transferred_tree_size},{tree_pool_size},{elapsed_time}")
             metrics_logger.info(f"{count},{accuracy},{kappa},"
-                                f"{candidate_tree_size},{tree_pool_size},{elapsed_time}")
+                                f"{candidate_tree_size},{transferred_tree_size},{tree_pool_size},{elapsed_time}")
+            if transferred_tree_size > 0:
+                print(f"----------------transferred {transferred_tree_size} into foreground")
 
             metric.correct = 0
             metric.window_actual_labels = []

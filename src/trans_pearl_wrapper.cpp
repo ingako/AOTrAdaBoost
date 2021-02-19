@@ -91,6 +91,10 @@ int trans_pearl_wrapper::get_candidate_tree_group_size() {
     return current_classifier->get_candidate_tree_group_size();
 }
 
+int trans_pearl_wrapper::get_transferred_tree_group_size() {
+    return current_classifier->get_transferred_tree_group_size();
+}
+
 int trans_pearl_wrapper::get_tree_pool_size() {
     return current_classifier->get_tree_pool_size();
 }
