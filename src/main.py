@@ -18,6 +18,9 @@ path = r'../'
 if path not in sys.path:
     sys.path.append(path)
 
+from ctypes import *
+libc = cdll.LoadLibrary("cmake-build-debug/trans_pearl_wrapper.cpython-37m-darwin.so")
+
 # from build.trans_pearl import adaptive_random_forest, pearl, trans_pearl
 # from trans_pearl import adaptive_random_forest, pearl, trans_pearl
 from trans_pearl_wrapper import adaptive_random_forest, pearl, trans_pearl_wrapper
@@ -305,7 +308,7 @@ if __name__ == '__main__':
                                      f"result-{args.generator_seed}-stream-{idx}.csv"
                 print(metric_output_file)
                 metrics_logger = setup_logger(f'metrics-{idx}', metric_output_file)
-                metrics_logger.info("count,accuracy,kappa,candidate_tree_size,tree_pool_size,time")
+                metrics_logger.info("count,accuracy,kappa,candidate_tree_size,transferred_tree_count,tree_pool_size,time")
                 metrics_loggers.append(metrics_logger)
 
             classifier = trans_pearl_wrapper(len(data_file_path.split(";")),

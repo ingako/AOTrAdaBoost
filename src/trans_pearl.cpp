@@ -225,6 +225,8 @@ void trans_pearl::train() {
         transfer(drifted_tree_pos_list);
 
         actual_drifted_trees = adapt_state(drifted_tree_pos_list, candidate_trees, false);
+
+        transferred_tree_total_count += transferred_foreground_pos_list.size();
     }
 }
 
@@ -295,7 +297,6 @@ vector<int> trans_pearl::adapt_state(
             }
         }
         cout << endl;
-
     }
 
     for (int i = 0; i < drifted_tree_pos_list.size(); i++) {
@@ -393,7 +394,7 @@ vector<int> trans_pearl::adapt_state(
 
         // log the number of transferred trees that swapped drifted trees
         if (is_transferred_tree) {
-            cout << "swapping with transfered_tree------------------" << endl;
+            cout << "swapping with transfered_tree on " << drifted_pos << "------------------" << endl;
             cout << swap_tree->kappa << endl;
             transferred_foreground_pos_list.push_back(drifted_pos);
         } else {
@@ -402,6 +403,7 @@ vector<int> trans_pearl::adapt_state(
                                       drifted_pos);
             if (position != transferred_foreground_pos_list.end()) {
                 transferred_foreground_pos_list.erase(position);
+                cout << "erased transfered_tree on " << drifted_pos << "------------------" << endl;
             }
         }
 
@@ -440,7 +442,7 @@ vector<int> trans_pearl::adapt_state(
 }
 
 int trans_pearl::get_transferred_tree_group_size() const {
-    return this->transferred_foreground_pos_list.size();
+    return this->transferred_tree_total_count;
 }
 
 void trans_pearl::set_expected_drift_prob(int tree_idx, double p) {

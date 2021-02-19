@@ -59,6 +59,7 @@ class trans_pearl : public pearl {
         shared_ptr<trans_pearl_tree> match_concept(shared_ptr<trans_pearl_tree> drifted_tree);
         int get_transferred_tree_group_size() const;
         vector<int> transferred_foreground_pos_list;
+        int transferred_tree_total_count = 0;
 
 private:
 
