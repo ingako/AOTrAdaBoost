@@ -274,7 +274,7 @@ void trans_pearl::update_drifted_tree_indices(const vector<int>& tree_indices) {
 }
 
 vector<int> trans_pearl::adapt_state(
-        const vector<int>& drifted_tree_pos_list,
+        vector<int>& drifted_tree_pos_list,
         deque<shared_ptr<pearl_tree>>& _candidate_trees,
         bool is_transferred_tree) {
 
@@ -288,15 +288,20 @@ vector<int> trans_pearl::adapt_state(
     }
     sort(_candidate_trees.begin(), _candidate_trees.end(), compare_kappa);
 
-    if (is_transferred_tree) {
-        cout << "kappa: ";
-        for (int i = 0; i < _candidate_trees.size(); i++) {
-            cout << _candidate_trees[i]->kappa << " ";
-            if (_candidate_trees[i]->kappa < 0.1) {
-                _candidate_trees.pop_front();
-            }
-        }
-        cout << endl;
+    // if (is_transferred_tree) {
+    //     cout << "kappa: ";
+    //     for (int i = 0; i < _candidate_trees.size(); i++) {
+    //         cout << _candidate_trees[i]->kappa << " ";
+    //         if (_candidate_trees[i]->kappa < 0.1) {
+    //             _candidate_trees.pop_front();
+    //         }
+    //     }
+    //     cout << endl;
+    // }
+
+    if (!is_transferred_tree) {
+        // reverse so the best candidate trees will test against worst transferred trees first
+        std::reverse(drifted_tree_pos_list.begin(), drifted_tree_pos_list.end());
     }
 
     for (int i = 0; i < drifted_tree_pos_list.size(); i++) {
@@ -319,6 +324,25 @@ vector<int> trans_pearl::adapt_state(
         cur_state.erase(drifted_tree->tree_pool_id);
 
         bool add_to_repo = false;
+
+        // Do nothing if a more performant transferred_tree has replaced the current drifted tree
+        if (!is_transferred_tree) {
+            auto position = std::find(transferred_foreground_pos_list.begin(),
+                                      transferred_foreground_pos_list.end(),
+                                      drifted_pos);
+            if (position != transferred_foreground_pos_list.end()) {
+                if (_candidate_trees.size() > 0
+                    && _candidate_trees.back()->kappa
+                       - drifted_tree->kappa > cd_kappa_threshold) {
+                    transferred_foreground_pos_list.erase(position);
+                    cout << "erased transferred_tree on " << drifted_pos << "------------------" << "with kappa " << candidate_trees.back()->kappa <<  endl;
+
+                } else {
+                    continue;
+                }
+            }
+
+        }
 
         if (_candidate_trees.size() > 0
                 && _candidate_trees.back()->kappa
@@ -394,20 +418,9 @@ vector<int> trans_pearl::adapt_state(
 
         // log the number of transferred trees that swapped drifted trees
         if (is_transferred_tree) {
-            cout << "swapping with transfered_tree on " << drifted_pos << "------------------" << endl;
-            cout << swap_tree->kappa << endl;
+            cout << "swapping with transferred_tree on " << drifted_pos << "------------------" << "with kappa " << swap_tree->kappa << endl;
             transferred_foreground_pos_list.push_back(drifted_pos);
-        } else {
-            auto position = std::find(transferred_foreground_pos_list.begin(),
-                                      transferred_foreground_pos_list.end(),
-                                      drifted_pos);
-            if (position != transferred_foreground_pos_list.end()) {
-                transferred_foreground_pos_list.erase(position);
-                cout << "erased transfered_tree on " << drifted_pos << "------------------" << endl;
-            }
         }
-
-        // start swapping trees
 
         if (enable_state_graph) {
             if (swap_tree->tree_pool_id == -1) {
@@ -535,11 +548,27 @@ void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
         vector<shared_ptr<pearl_tree>> best_models = bbt_pools[drifted_tree_idx]->get_best_models();
         transfer_trees.insert(std::end(transfer_trees), std::begin(best_models), std::end(best_models));
 
+        // if (transfer_trees.size() > 0) {
+        //     cout << "matched tree:" << endl;
+        //     cout << matched_tree->tree->printTree() << endl;
+        //     cout << "transfer tree:" << endl;
+        //     cout << transfer_trees[0]->tree->printTree() << endl;
+        //     exit(0);
+        // }
+
         bbt_pools[drifted_tree_idx] = nullptr;
     }
 
+
     if (transfer_trees.size() > 0) {
-        cout << "adapting state - size of transfer_trees: " << transfer_trees.size() << endl;
+        cout << "-----------------transfer(): transferred_tree kappa: ";
+        for (auto tree : transfer_trees) {
+            tree->update_kappa(actual_labels, instance->getNumberClasses());
+            // cout << tree->kappa << " ";
+        }
+
+        // cout << endl;
+        // cout << "adapting state - size of transfer_trees: " << transfer_trees.size() << endl;
         adapt_state(actual_drifted_trees, transfer_trees, true);
     }
 }
