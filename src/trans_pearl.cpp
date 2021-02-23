@@ -592,7 +592,7 @@ shared_ptr<trans_pearl_tree> trans_pearl::match_concept(vector<Instance*> warnin
     vector<int> true_labels;
     for (auto warning_period_instance : warning_period_instances) {
         true_labels.push_back(warning_period_instance->getLabel());
-    }
+    // }
 
     for (auto registered_tree_pool : registered_tree_pools) {
         for (auto tree : *registered_tree_pool) {
@@ -606,8 +606,8 @@ shared_ptr<trans_pearl_tree> trans_pearl::match_concept(vector<Instance*> warnin
             }
 
             // double kappa = trans_tree->update_kappa(true_labels, class_count, true);
-            double kappa = compute_kappa(predicted_labels, true_labels, class_count);
-            // cout << "trans_tree kappa: " << trans_tree->kappa << endl;
+            trans_tree->kappa = compute_kappa(predicted_labels, true_labels, class_count);
+            // cout << "match_concept trans_tree kappa: " << trans_tree->kappa << endl;
             if (highest_kappa < trans_tree->kappa) {
                 highest_kappa = trans_tree->kappa;
                 matched_tree = trans_tree;
