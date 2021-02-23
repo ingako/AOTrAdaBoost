@@ -83,16 +83,8 @@ void trans_pearl::train() {
     actual_drifted_trees.clear();
 
     if (drift_warning_period_lengths.size() == 0) {
-        drift_warning_period_lengths.resize(num_trees, 0);
+        drift_warning_period_lengths.resize(num_trees, -999);
     }
-    if (stream_instance_idx == 25000) {
-        cout << "drift_warning_distance: " << endl;
-        for (int i = 0; i < num_trees; i++) {
-            cout << drift_warning_period_lengths[i] << " ";
-        }
-        cout << endl;
-    }
-
 
     if (foreground_trees.empty()) {
         init();
@@ -127,6 +119,12 @@ void trans_pearl::train() {
             drift_warning_period_lengths[i]++;
         }
 
+        if (bbt_pools[i] != nullptr) {
+            // Add instance to mini-batch. Boosting auto triggers when the mini-batch is full.
+            bbt_pools[i]->online_tradaboost(instance->clone(), true, false);
+            bbt_pools[i]->warning_period_instances.push_back(instance->clone());
+        }
+
         // online bagging
         std::poisson_distribution<int> poisson_distr(lambda);
         int weight = poisson_distr(mrand);
@@ -148,24 +146,11 @@ void trans_pearl::train() {
         int error_count = (int) (predicted_label != actual_label);
 
         bool warning_detected_only = false;
-
-        // detect warning
-        if (detect_change(error_count, cur_tree->warning_detector)) {
-            warning_detected_only = true;
-            cur_tree->bg_pearl_tree = make_pearl_tree(-1);
-            cur_tree->warning_detector->resetChange();
-            if (drift_warning_period_lengths[i] == 0) {
-                drift_warning_period_lengths[i] = 1;
-            }
-
-            shared_ptr<trans_pearl_tree> tree_template
-                    = static_pointer_cast<trans_pearl_tree>(cur_tree->bg_pearl_tree);
-            bbt_pools[i] = make_unique<boosted_bg_tree_pool>(bbt_pool_size, mini_batch_size, tree_template, this->lambda);
-        }
+        bool drift_detected = false;
 
         // detect drift
         if (detect_change(error_count, cur_tree->drift_detector)) {
-            warning_detected_only = false;
+            drift_detected = true;
             drifted_tree_pos_list.push_back(i);
             potential_drifted_tree_indices.insert(i);
 
@@ -173,7 +158,28 @@ void trans_pearl::train() {
             cur_tree->drift_detector->resetChange();
 
             if (drift_warning_period_lengths[i] > 0) {
-                drift_warning_period_lengths[i] = -drift_warning_period_lengths[i];
+                // drift_warning_period_lengths[i] = -drift_warning_period_lengths[i];
+                drift_warning_period_lengths[i] = -999;
+            }
+        }
+
+        // detect warning
+        if (detect_change(error_count, cur_tree->warning_detector)) {
+            cur_tree->bg_pearl_tree = make_pearl_tree(-1);
+            cur_tree->warning_detector->resetChange();
+
+            if (drift_warning_period_lengths[i] == -999) {
+                drift_warning_period_lengths[i] = 1;
+            }
+
+            if (!drift_detected) {
+                warning_detected_only = true;
+
+                shared_ptr<trans_pearl_tree> tree_template
+                        = static_pointer_cast<trans_pearl_tree>(cur_tree->bg_pearl_tree);
+                bbt_pools[i] = make_unique<boosted_bg_tree_pool>(bbt_pool_size, mini_batch_size, tree_template,
+                                                                 this->lambda);
+                bbt_pools[i]->warning_period_instances.push_back(instance->clone());
             }
         }
 
@@ -188,12 +194,6 @@ void trans_pearl::train() {
         //     stability_detectors[i] = make_unique<HT::ADWIN>(stability_delta);
         //     stable_tree_indices.push_back(i);
         // }
-
-        if (bbt_pools[i] != nullptr) {
-            // Add instance to mini-batch. Boosting auto triggers when the mini-batch is full.
-            bbt_pools[i]->online_tradaboost(instance->clone(), true, false);
-            bbt_pools[i]->warning_period_instances.push_back(instance->clone());
-        }
 
         // ozaboost: update weights
         // if (error_count == 0) {
@@ -221,8 +221,26 @@ void trans_pearl::train() {
 
     // if actual drifts are detected, swap trees and update cur_state
     if (drifted_tree_pos_list.size() > 0) {
+
+        // cout << endl;
+        // cout << "drift_warning_distance: ";
+        // for (int i = 0; i < num_trees; i++) {
+        //     if (drift_warning_period_lengths[i] == -999) continue;
+        //     cout << i << ":" << drift_warning_period_lengths[i] << " ";
+        // }
+        // cout << endl;
+
+        // cout << "drifted_tree_pos: ";
+        // for (auto idx : drifted_tree_pos_list) {
+        //     cout << idx << " ";
+        // }
+        // cout << endl;
+
         transferred_foreground_pos_list.clear();
         transfer(drifted_tree_pos_list);
+        for (auto idx : drifted_tree_pos_list) {
+            bbt_pools[idx] = nullptr;
+        }
 
         actual_drifted_trees = adapt_state(drifted_tree_pos_list, candidate_trees, false);
 
@@ -501,7 +519,7 @@ bool trans_pearl::has_actual_drifted_trees() {
     return actual_drifted_trees.size() > 0;
 }
 
-void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
+void trans_pearl::transfer(vector<int>& drifted_tree_indices) {
     // For each actual drifted trees
     // 1. Concept Matching
     // 2. Boosting
@@ -510,7 +528,7 @@ void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
 
     deque<shared_ptr<pearl_tree>> transfer_trees;
 
-    for (auto drifted_tree_idx : actual_drifted_trees) {
+    for (auto drifted_tree_idx : drifted_tree_indices) {
         if (bbt_pools[drifted_tree_idx] == nullptr) {
             // cout << "transfer: bbt_pool does not exist for an actual drifted tree"  << endl;
             // exit(1);
@@ -518,21 +536,14 @@ void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
         }
 
         if (bbt_pools[drifted_tree_idx]->warning_period_instances.size() < least_transfer_warning_period_length) {
-            // cout << "warning_period_instances size is not enough" << endl;
+            cout << "-------------------------------------warning_period_instances size is not enough: "
+                 << drifted_tree_idx << ":"
+                 << bbt_pools[drifted_tree_idx]->warning_period_instances.size() << endl;
             return;
         }
 
-        shared_ptr<trans_pearl_tree> drifted_trans_pearl_tree =
-                static_pointer_cast<trans_pearl_tree>(foreground_trees[drifted_tree_idx]);
-        shared_ptr<trans_pearl_tree> bg_trans_pearl_tree =
-                static_pointer_cast<trans_pearl_tree>(drifted_trans_pearl_tree->bg_pearl_tree);
-        if (bg_trans_pearl_tree== nullptr) {
-            // cout << "transfer: bg_drifted_tree is nullptr" << endl;
-            return;
-        }
-
-
-        shared_ptr<trans_pearl_tree> matched_tree = match_concept(bg_trans_pearl_tree);
+        shared_ptr<trans_pearl_tree> matched_tree =
+                match_concept(bbt_pools[drifted_tree_idx]->warning_period_instances);
         if (matched_tree == nullptr) {
             continue;
         }
@@ -564,28 +575,22 @@ void trans_pearl::transfer(vector<int>& actual_drifted_trees) {
         cout << "-----------------transfer(): transferred_tree kappa: ";
         for (auto tree : transfer_trees) {
             tree->update_kappa(actual_labels, instance->getNumberClasses());
-            // cout << tree->kappa << " ";
+            cout << tree->kappa << " ";
         }
-
-        // cout << endl;
-        // cout << "adapting state - size of transfer_trees: " << transfer_trees.size() << endl;
-        adapt_state(actual_drifted_trees, transfer_trees, true);
+        cout << endl;
+        cout << "adapting state - size of transfer_trees: " << transfer_trees.size() << endl;
+        adapt_state(drifted_tree_indices, transfer_trees, true);
     }
 }
 
-shared_ptr<trans_pearl_tree> trans_pearl::match_concept(shared_ptr<trans_pearl_tree> drifted_tree) {
-    if (drifted_tree->instance_store.size() < least_transfer_warning_period_length) {
-        cout << "match_concept: drifted_tree does not have enough warning_period_instance" << endl;
-        return nullptr;
-    }
-
+shared_ptr<trans_pearl_tree> trans_pearl::match_concept(vector<Instance*> warning_period_instances) {
     shared_ptr<trans_pearl_tree> matched_tree = nullptr;
     double highest_kappa = 0.0;
 
     // For kappa calculation
-    int class_count = drifted_tree->instance_store[0]->getNumberClasses();
+    int class_count = warning_period_instances[0]->getNumberClasses();
     vector<int> true_labels;
-    for (auto warning_period_instance : drifted_tree->instance_store) {
+    for (auto warning_period_instance : warning_period_instances) {
         true_labels.push_back(warning_period_instance->getLabel());
     }
 
@@ -594,7 +599,7 @@ shared_ptr<trans_pearl_tree> trans_pearl::match_concept(shared_ptr<trans_pearl_t
             shared_ptr<trans_pearl_tree> trans_tree = static_pointer_cast<trans_pearl_tree>(tree);
 
             vector<int> predicted_labels;
-            for (auto warning_period_instance : drifted_tree->instance_store) {
+            for (auto warning_period_instance : warning_period_instances) {
                 // TODO: reset performance tracking?
                 int prediction = trans_tree->predict(*warning_period_instance, false);
                 predicted_labels.push_back(prediction);

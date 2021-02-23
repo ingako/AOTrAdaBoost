@@ -56,7 +56,7 @@ class trans_pearl : public pearl {
         vector<shared_ptr<pearl_tree>>& get_concept_repo();
         void register_tree_pool(vector<shared_ptr<pearl_tree>>& pool);
         bool has_actual_drifted_trees();
-        shared_ptr<trans_pearl_tree> match_concept(shared_ptr<trans_pearl_tree> drifted_tree);
+        shared_ptr<trans_pearl_tree> match_concept(vector<Instance*> warning_period_instances);
         int get_transferred_tree_group_size() const;
         vector<int> transferred_foreground_pos_list;
         int transferred_tree_total_count = 0;
