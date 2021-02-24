@@ -301,8 +301,10 @@ vector<int> trans_pearl::adapt_state(
     int class_count = instance->getNumberClasses();
 
     // sort candidate trees by kappa
-    for (int i = 0; i < _candidate_trees.size(); i++) {
-        _candidate_trees[i]->update_kappa(actual_labels, class_count);
+    if (!is_transferred_tree) {
+        for (int i = 0; i < _candidate_trees.size(); i++) {
+            _candidate_trees[i]->update_kappa(actual_labels, class_count);
+        }
     }
     sort(_candidate_trees.begin(), _candidate_trees.end(), compare_kappa);
 
@@ -559,13 +561,16 @@ void trans_pearl::transfer(vector<int>& drifted_tree_indices) {
         vector<shared_ptr<pearl_tree>> best_models = bbt_pools[drifted_tree_idx]->get_best_models();
         transfer_trees.insert(std::end(transfer_trees), std::begin(best_models), std::end(best_models));
 
-        // if (transfer_trees.size() > 0) {
-        //     cout << "matched tree:" << endl;
-        //     cout << matched_tree->tree->printTree() << endl;
-        //     cout << "transfer tree:" << endl;
-        //     cout << transfer_trees[0]->tree->printTree() << endl;
-        //     exit(0);
-        // }
+        if (transfer_trees.size() > 0) {
+            cout << "matched tree:" << endl;
+            cout << matched_tree->tree->printTree() << endl;
+            cout << "transfer tree:" << endl;
+            cout << transfer_trees[0]->tree->printTree() << endl;
+            cout << "matched kappa: " << matched_tree->kappa << endl;
+            cout << "kappa: " << transfer_trees[0]->kappa << endl;
+            cout << "training weight seen by model: " << transfer_trees[0]->tree->trainingWeightSeenByModel << endl;
+            exit(0);
+        }
 
         bbt_pools[drifted_tree_idx] = nullptr;
     }
@@ -576,6 +581,11 @@ void trans_pearl::transfer(vector<int>& drifted_tree_indices) {
         for (auto tree : transfer_trees) {
             tree->update_kappa(actual_labels, instance->getNumberClasses());
             cout << tree->kappa << " ";
+        }
+        cout << endl;
+        cout << "-----------------transfer(): training weights seen by model: ";
+        for (auto tree : transfer_trees) {
+            cout << tree->tree->trainingWeightSeenByModel << " ";
         }
         cout << endl;
         cout << "adapting state - size of transfer_trees: " << transfer_trees.size() << endl;
@@ -592,7 +602,7 @@ shared_ptr<trans_pearl_tree> trans_pearl::match_concept(vector<Instance*> warnin
     vector<int> true_labels;
     for (auto warning_period_instance : warning_period_instances) {
         true_labels.push_back(warning_period_instance->getLabel());
-    // }
+    }
 
     for (auto registered_tree_pool : registered_tree_pools) {
         for (auto tree : *registered_tree_pool) {
@@ -868,8 +878,9 @@ trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(int pool_size,
         lambda(lambda) {
 
     mrand = std::mt19937(42);
-    oob_tree_correct_count.resize(mini_batch_size, 0);
-    oob_tree_total_count.resize(mini_batch_size, 0);
+    oob_tree_lam_sum.resize(mini_batch_size, 0);
+    oob_tree_correct_lam_sum.resize(mini_batch_size, 0);
+    oob_tree_wrong_lam_sum.resize(mini_batch_size, 0);
 }
 
 void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
@@ -889,18 +900,43 @@ void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
         }
     }
 
-    update_bbt();
+    for (int i = 0; i < 20; i++) {
+        update_bbt();
+    }
     boost();
 
     mini_batch.clear();
 }
 
 vector<shared_ptr<pearl_tree>> trans_pearl::boosted_bg_tree_pool::get_best_models() {
+    // For kappa calculation
+    int class_count = warning_period_instances[0]->getNumberClasses();
+    vector<int> true_labels;
+    for (auto warning_period_instance : warning_period_instances) {
+        true_labels.push_back(warning_period_instance->getLabel());
+    }
+
     vector<shared_ptr<pearl_tree>> best_models;
     for (auto tree : pool) {
+
+        vector<int> predicted_labels;
         for (auto instance : warning_period_instances) {
-            tree->predict(*instance, true);
+            // tree->predict(*instance, true);
+            int prediction = tree->predict(*instance, true);
+            predicted_labels.push_back(prediction);
         }
+
+        tree->kappa = compute_kappa(predicted_labels, true_labels, class_count);
+
+        // cout << endl;
+        // for (auto l : true_labels) {
+        //     cout << l << " ";
+        // }
+        // cout << endl;
+        // for (auto l : predicted_labels) {
+        //     cout << l << " ";
+        // }
+        // cout << "get_best_model kappa: " << tree->kappa << endl;
 
         // TODO return top k
         best_models.push_back(tree);
@@ -923,14 +959,14 @@ void trans_pearl::boosted_bg_tree_pool::update_bbt() {
 
 void trans_pearl::boosted_bg_tree_pool::boost() {
     for (Instance* instance : mini_batch) {
-        double weight = 1.0;
+        double weight = 1.0; // TODO param
         instance->setWeight(weight);
     }
 
-    vector<int> lambdas(mini_batch_size, lambda);
+    vector<double> lambdas(mini_batch_size, lambda);
 
-    double z = 0;
-    for (auto tree : pool) {
+    for (int tree_idx = 0; tree_idx < pool.size(); tree_idx++) {
+        auto tree = pool[tree_idx];
         for (int i = 0; i < mini_batch.size(); i++) {
             Instance* instance = mini_batch[i];
 
@@ -939,30 +975,111 @@ void trans_pearl::boosted_bg_tree_pool::boost() {
             int k = poisson_distr(mrand);
 
             double weight = instance->getWeight();
-            instance->setWeight(k * weight);
-            tree->train(*instance);
-            instance->setWeight(weight);
+            if (k > 0 && weight > 0) {
+                instance->setWeight(k * weight);
+                tree->train(*instance);
+                instance->setWeight(weight);
+            }
 
             // boosting based on out-of-bag errors
             if (k == 0) {
-                oob_tree_total_count[i] += 1;
+                oob_tree_lam_sum[i] += lambdas[i];
+                bool correctly_classified;
                 if (tree->predict(*instance, false) == instance->getLabel()) {
-                    oob_tree_correct_count[i] += 1;
+                    oob_tree_correct_lam_sum[i] += lambdas[i];
+                    correctly_classified = true;
+                } else {
+                    oob_tree_wrong_lam_sum[i] += lambdas[i];
+                    correctly_classified = false;
                 }
 
-                double c = oob_tree_correct_count[i]
-                                / oob_tree_total_count[i];
                 if (is_same_distribution) {
-                    lambdas[i] = 1 - c;
+                    if (correctly_classified) {
+                        if (oob_tree_correct_lam_sum[i] > 0) {
+                            lambdas[i] *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                        }
+                    } else {
+                        if (oob_tree_wrong_lam_sum[i] > 0) {
+                            lambdas[i] *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                        }
+                    }
                 } else {
-                    lambdas[i] = c;
+                    if (correctly_classified) {
+                        if (oob_tree_wrong_lam_sum[i] > 0) {
+                            lambdas[i] *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                        }
+                    } else {
+                        if (oob_tree_correct_lam_sum[i] > 0) {
+                            lambdas[i] *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                        }
+                    }
+                }
+
+                if (lambdas[i] == std::numeric_limits<float>::infinity()) {
+                    cout << "inf" << endl;
+                    cout << "oob_tree_correct_lam_sum: " <<  oob_tree_correct_lam_sum[i] << endl;
+                    cout << "oob_tree_wrong_lam_sum: " <<  oob_tree_wrong_lam_sum[i] << endl;
+                    exit(1);
                 }
             }
-            z += lambdas[i];
         }
 
-        for (int i = 0; i < mini_batch.size(); i++) {
-            lambdas[i] = lambdas[i] / z;
+        // cout << "lamb: ";
+        // for (auto l : lambdas) {
+        //     cout << l << " ";
+        // }
+        // cout << endl << "oobc: ";
+        // for (auto l : oob_tree_correct_lam_sum) {
+        //     cout << l << " ";
+        // }
+        // cout << endl << "oobw: ";
+        // for (auto l : oob_tree_wrong_lam_sum) {
+        //     cout << l << " ";
+        // }
+        // cout << endl;
+
+    }
+}
+
+double trans_pearl::boosted_bg_tree_pool::compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count) {
+    // prepare confusion matrix
+    vector<vector<int>> confusion_matrix(class_count, vector<int>(class_count, 0));
+    int correct = 0;
+
+    for (int i = 0; i < predicted_labels.size(); i++) {
+        confusion_matrix[actual_labels[i]][predicted_labels[i]]++;
+        if (actual_labels[i] == predicted_labels[i]) {
+            correct++;
         }
     }
+
+    double accuracy = (double) correct / predicted_labels.size();
+
+    // computes the Cohen's kappa coefficient
+    int sample_count = predicted_labels.size();
+    double p0 = accuracy;
+    double pc = 0.0;
+    int row_count = class_count;
+    int col_count = class_count;
+
+
+    for (int i = 0; i < row_count; i++) {
+        double row_sum = 0;
+        for (int j = 0; j < col_count; j++) {
+            row_sum += confusion_matrix[i][j];
+        }
+
+        double col_sum = 0;
+        for (int j = 0; j < row_count; j++) {
+            col_sum += confusion_matrix[j][i];
+        }
+
+        pc += (row_sum / sample_count) * (col_sum / sample_count);
+    }
+
+    if (pc == 1) {
+        return 1;
+    }
+
+    return (p0 - pc) / (1.0 - pc);
 }

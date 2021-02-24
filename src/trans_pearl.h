@@ -121,8 +121,9 @@ private:
             bool is_same_distribution = true;
             vector<Instance*> warning_period_instances;
 
+            double compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count);
         private:
-            int lambda = 1;
+            double lambda = 1;
             std::mt19937 mrand;
 
             long pool_size = 10;
@@ -131,8 +132,9 @@ private:
             shared_ptr<trans_pearl_tree> tree_template;
             vector<Instance*> mini_batch;
             vector<shared_ptr<trans_pearl_tree>> pool;
-            vector<int> oob_tree_correct_count; // count of out-of-bag correctly predicted trees per instance
-            vector<int> oob_tree_total_count; // count of oob trees per instance
+            vector<double> oob_tree_correct_lam_sum; // count of out-of-bag correctly predicted trees per instance
+            vector<double> oob_tree_wrong_lam_sum; // count of out-of-bag incorrectly predicted trees per instance
+            vector<double> oob_tree_lam_sum; // count of oob trees per instance
 
             // execute replacement strategies when the bbt pool is full
             void update_bbt();
