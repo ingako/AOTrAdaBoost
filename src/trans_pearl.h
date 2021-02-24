@@ -156,14 +156,14 @@ public:
 
     // 1. For matching a concept by running other trees in other domains on it
     // 2. For generating data by using KNN
-    vector<Instance*> instance_store;
+    deque<Instance*> instance_store;
     int instance_store_size;
 
-    virtual void train(Instance &instance);
+    void store_instance(Instance* instance);
 
     vector<Instance*> generate_data(Instance* instance, int num_instances);
     vector<DenseInstance*> find_k_closest_instances(DenseInstance* target_instance,
-                                                    vector<Instance*>& instance_store,
+                                                    deque<Instance*>& instance_store,
                                                     int k);
 };
 

@@ -107,8 +107,7 @@ void trans_pearl::train() {
     vector<int> warning_tree_pos_list;
     vector<int> drifted_tree_pos_list;
 
-    shared_ptr<pearl_tree> cur_tree = nullptr;
-
+    shared_ptr<trans_pearl_tree> cur_tree = nullptr;
 
     // ozaboost
     // double lambda_d = this->lambda;
@@ -139,8 +138,13 @@ void trans_pearl::train() {
 
         instance->setWeight(weight);
 
-        cur_tree = static_pointer_cast<pearl_tree>(foreground_trees[i]);
+        cur_tree = static_pointer_cast<trans_pearl_tree>(foreground_trees[i]);
         cur_tree->train(*instance);
+        cur_tree->store_instance(instance);
+        if (instance == nullptr) {
+            cout << "train(): null instance" << endl;
+            exit(1);
+        }
 
         int predicted_label = cur_tree->predict(*instance, true);
         int error_count = (int) (predicted_label != actual_label);
@@ -550,6 +554,11 @@ void trans_pearl::transfer(vector<int>& drifted_tree_indices) {
             continue;
         }
 
+
+        // force trigger boosting on warning_period_instances
+        bbt_pools[drifted_tree_idx]->online_tradaboost(nullptr, true, true);
+
+
         // TODO stopping criteria
         // cout << "generating pseudo_instances" << endl;
         vector<Instance*> pseudo_instances = matched_tree->generate_data(instance, num_pseudo_instances);
@@ -561,18 +570,23 @@ void trans_pearl::transfer(vector<int>& drifted_tree_indices) {
         vector<shared_ptr<pearl_tree>> best_models = bbt_pools[drifted_tree_idx]->get_best_models();
         transfer_trees.insert(std::end(transfer_trees), std::begin(best_models), std::end(best_models));
 
-        if (transfer_trees.size() > 0) {
-            cout << "matched tree:" << endl;
-            cout << matched_tree->tree->printTree() << endl;
-            cout << "transfer tree:" << endl;
-            cout << transfer_trees[0]->tree->printTree() << endl;
-            cout << "matched kappa: " << matched_tree->kappa << endl;
-            cout << "kappa: " << transfer_trees[0]->kappa << endl;
-            cout << "training weight seen by model: " << transfer_trees[0]->tree->trainingWeightSeenByModel << endl;
-            exit(0);
-        }
+        // if (transfer_trees.size() > 0) {
+        //     cout << "matched tree:" << endl;
+        //     cout << matched_tree->tree->printTree() << endl;
+        //     cout << "transfer tree:" << endl;
+        //     cout << transfer_trees[0]->tree->printTree() << endl;
+        //     cout << "matched kappa: " << matched_tree->kappa << endl;
+        //     cout << "kappa: " << transfer_trees[0]->kappa << endl;
+        //     cout << "training weight seen by model: " << transfer_trees[0]->tree->trainingWeightSeenByModel << endl;
 
-        bbt_pools[drifted_tree_idx] = nullptr;
+
+
+        //     for (auto ins : bbt_pools[drifted_tree_idx]->warning_period_instances) {
+        //         transfer_trees[0]->train(*ins);
+        //     }
+        //     cout << transfer_trees[0]->tree->printTree() << endl;
+        //     exit(1);
+        // }
     }
 
 
@@ -745,21 +759,24 @@ trans_pearl_tree::trans_pearl_tree(trans_pearl_tree const &rhs)
                      rhs.mrand),
           instance_store_size(instance_store_size) {}
 
-void trans_pearl_tree::train(Instance& instance) {
-    this->instance_store.push_back(&instance); // for generate_data
+void trans_pearl_tree::store_instance(Instance* instance) {
+    if (instance == nullptr) {
+        cout << "nullptr instance added! " << endl;
+        exit(1);
+    }
+    this->instance_store.push_back(instance); // for generate_data
     if (this->bg_pearl_tree != nullptr) {
         shared_ptr<trans_pearl_tree> trans_bg_tree;
         trans_bg_tree = static_pointer_cast<trans_pearl_tree>(this->bg_pearl_tree);
-        trans_bg_tree->instance_store.push_back(&instance);
+        trans_bg_tree->instance_store.push_back(instance);
         if (trans_bg_tree->instance_store.size() > this->instance_store_size) {
-            trans_bg_tree->instance_store.erase(trans_bg_tree->instance_store.begin()); // TODO deque
+            trans_bg_tree->instance_store.pop_front();
         }
     }
 
-    if (this->instance_store.size() > 500) {
-        this->instance_store.erase(this->instance_store.begin()); // TODO deque
+    if (this->instance_store.size() > this->instance_store_size) {
+        this->instance_store.pop_front();
     }
-    pearl_tree::train(instance);
 }
 
 vector<Instance*> trans_pearl_tree::generate_data(Instance* instance, int num_instances) {
@@ -770,6 +787,15 @@ vector<Instance*> trans_pearl_tree::generate_data(Instance* instance, int num_in
 
     // cout << "generate_data..." << this->instance_store.size() << endl;
     vector<Instance*> pseudo_instances;
+
+    // for (int i = 0; i < num_instances; i++) {
+    //     if (this->instance_store[i] == nullptr) {
+    //         cout << "generate_data: instance in instance_store is null" << endl;
+    //         cout << "generate_data: instance_store size: " << this->instance_store.size() << endl;
+    //         exit(1);
+    //     }
+    //     pseudo_instances.push_back(this->instance_store[i]);
+    // }
 
     for (int i = 0; i < num_instances; i++) {
         DenseInstance *pseudo_instance = this->tree->generate_data((DenseInstance *) instance);
@@ -812,7 +838,7 @@ vector<Instance*> trans_pearl_tree::generate_data(Instance* instance, int num_in
 }
 
 vector<DenseInstance*> trans_pearl_tree::find_k_closest_instances(DenseInstance* target_instance,
-                                                             vector<Instance*>& instance_store,
+                                                             deque<Instance*>& instance_store,
                                                              int k) {
     int num_row = target_instance->modifiedAttIndices.size() + 1;
     int num_col = instance_store.size();
@@ -820,6 +846,11 @@ vector<DenseInstance*> trans_pearl_tree::find_k_closest_instances(DenseInstance*
     // Prepare data points
     vector<vector<double>> data(num_row, vector<double>());
     for (auto cur_instance : instance_store) {
+        // if (cur_instance == nullptr) {
+        //     cout << "find_k: instance in instance_store is null" << endl;
+        //     cout << "find_k: instance_store size: " << this->instance_store.size() << endl;
+        //     exit(1);
+        // }
         for (int i = 0; i < num_row - 1; i++) {
             int attIdx = target_instance->modifiedAttIndices[i];
             data[i].push_back(cur_instance->getInputAttributeValue(attIdx));
@@ -894,7 +925,15 @@ void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
     }
 
     if (mini_batch.size() < mini_batch_size) {
-        mini_batch.push_back(instance);
+        if (instance == nullptr) {
+            if(!force_trigger) {
+                cout << "Non force trigger setting can not pass nullptr instance" << endl;
+                exit(1);
+            }
+        } else {
+            mini_batch.push_back(instance);
+        }
+
         if (!force_trigger) {
             return;
         }
@@ -958,6 +997,10 @@ void trans_pearl::boosted_bg_tree_pool::update_bbt() {
 }
 
 void trans_pearl::boosted_bg_tree_pool::boost() {
+    oob_tree_lam_sum.resize(mini_batch.size(), 0);
+    oob_tree_correct_lam_sum.resize(mini_batch.size(), 0);
+    oob_tree_wrong_lam_sum.resize(mini_batch_size, 0);
+
     for (Instance* instance : mini_batch) {
         double weight = 1.0; // TODO param
         instance->setWeight(weight);
@@ -977,6 +1020,12 @@ void trans_pearl::boosted_bg_tree_pool::boost() {
             double weight = instance->getWeight();
             if (k > 0 && weight > 0) {
                 instance->setWeight(k * weight);
+
+                if (instance == nullptr) {
+                    cout << "boost(): null instance" << endl;
+                    exit(1);
+                }
+
                 tree->train(*instance);
                 instance->setWeight(weight);
             }
