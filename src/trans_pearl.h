@@ -124,6 +124,7 @@ private:
             double compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count);
         private:
             double lambda = 1;
+            double epsilon = 0.00000001;
             std::mt19937 mrand;
 
             long pool_size = 10;
@@ -139,6 +140,7 @@ private:
             // execute replacement strategies when the bbt pool is full
             void update_bbt();
             void boost();
+            void boost(Instance* instance);
         };
 
 };

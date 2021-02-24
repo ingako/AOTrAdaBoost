@@ -579,12 +579,6 @@ void trans_pearl::transfer(vector<int>& drifted_tree_indices) {
         //     cout << "kappa: " << transfer_trees[0]->kappa << endl;
         //     cout << "training weight seen by model: " << transfer_trees[0]->tree->trainingWeightSeenByModel << endl;
 
-
-
-        //     for (auto ins : bbt_pools[drifted_tree_idx]->warning_period_instances) {
-        //         transfer_trees[0]->train(*ins);
-        //     }
-        //     cout << transfer_trees[0]->tree->printTree() << endl;
         //     exit(1);
         // }
     }
@@ -788,9 +782,10 @@ vector<Instance*> trans_pearl_tree::generate_data(Instance* instance, int num_in
     // cout << "generate_data..." << this->instance_store.size() << endl;
     vector<Instance*> pseudo_instances;
 
-    // for (int i = 0; i < num_instances; i++) {
+    // for (int i = 0; i < this->instance_store.size(); i++) {
     //     if (this->instance_store[i] == nullptr) {
     //         cout << "generate_data: instance in instance_store is null" << endl;
+    //         cout << "generate_data: index " << i << endl;
     //         cout << "generate_data: instance_store size: " << this->instance_store.size() << endl;
     //         exit(1);
     //     }
@@ -841,16 +836,16 @@ vector<DenseInstance*> trans_pearl_tree::find_k_closest_instances(DenseInstance*
                                                              deque<Instance*>& instance_store,
                                                              int k) {
     int num_row = target_instance->modifiedAttIndices.size() + 1;
-    int num_col = instance_store.size();
+    int num_col = this->instance_store.size();
 
     // Prepare data points
     vector<vector<double>> data(num_row, vector<double>());
-    for (auto cur_instance : instance_store) {
-        // if (cur_instance == nullptr) {
-        //     cout << "find_k: instance in instance_store is null" << endl;
-        //     cout << "find_k: instance_store size: " << this->instance_store.size() << endl;
-        //     exit(1);
-        // }
+    for (auto cur_instance : this->instance_store) {
+        if (cur_instance == nullptr) {
+            cout << "find_k: instance in instance_store is null" << endl;
+            cout << "find_k: instance_store size: " << this->instance_store.size() << endl;
+            exit(1);
+        }
         for (int i = 0; i < num_row - 1; i++) {
             int attIdx = target_instance->modifiedAttIndices[i];
             data[i].push_back(cur_instance->getInputAttributeValue(attIdx));
@@ -909,9 +904,6 @@ trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(int pool_size,
         lambda(lambda) {
 
     mrand = std::mt19937(42);
-    oob_tree_lam_sum.resize(mini_batch_size, 0);
-    oob_tree_correct_lam_sum.resize(mini_batch_size, 0);
-    oob_tree_wrong_lam_sum.resize(mini_batch_size, 0);
 }
 
 void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
@@ -939,7 +931,7 @@ void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
         }
     }
 
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 2; i++) {
         update_bbt();
     }
     boost();
@@ -997,97 +989,103 @@ void trans_pearl::boosted_bg_tree_pool::update_bbt() {
 }
 
 void trans_pearl::boosted_bg_tree_pool::boost() {
-    oob_tree_lam_sum.resize(mini_batch.size(), 0);
-    oob_tree_correct_lam_sum.resize(mini_batch.size(), 0);
-    oob_tree_wrong_lam_sum.resize(mini_batch_size, 0);
-
+    cout << "start boosting" << endl;
     for (Instance* instance : mini_batch) {
-        double weight = 1.0; // TODO param
-        instance->setWeight(weight);
+        this->boost(instance);
     }
+}
 
-    vector<double> lambdas(mini_batch_size, lambda);
+void trans_pearl::boosted_bg_tree_pool::boost(Instance* instance) {
+    oob_tree_lam_sum.resize(pool.size(), 0);
+    oob_tree_correct_lam_sum.resize(pool.size(), 0);
+    oob_tree_wrong_lam_sum.resize(pool.size(), 0);
+    double lambda_d = lambda;
 
-    for (int tree_idx = 0; tree_idx < pool.size(); tree_idx++) {
-        auto tree = pool[tree_idx];
-        for (int i = 0; i < mini_batch.size(); i++) {
-            Instance* instance = mini_batch[i];
+    cout << "lamb: " ;
+    for (int i = 0; i < pool.size(); i++) {
+        auto tree = pool[i];
 
-            // bagging
-            std::poisson_distribution<int> poisson_distr(lambdas[i]);
-            int k = poisson_distr(mrand);
+        // bagging
+        std::poisson_distribution<int> poisson_distr(lambda_d);
+        double k = poisson_distr(mrand);
 
-            double weight = instance->getWeight();
-            if (k > 0 && weight > 0) {
-                instance->setWeight(k * weight);
+        double weight = instance->getWeight();
+        if (k > 0 && weight > 0) {
+            instance->setWeight(k * weight);
 
-                if (instance == nullptr) {
-                    cout << "boost(): null instance" << endl;
-                    exit(1);
-                }
-
-                tree->train(*instance);
-                instance->setWeight(weight);
+            if (instance == nullptr) {
+                cout << "boost(): null instance" << endl;
+                exit(1);
             }
 
-            // boosting based on out-of-bag errors
-            if (k == 0) {
-                oob_tree_lam_sum[i] += lambdas[i];
-                bool correctly_classified;
-                if (tree->predict(*instance, false) == instance->getLabel()) {
-                    oob_tree_correct_lam_sum[i] += lambdas[i];
-                    correctly_classified = true;
-                } else {
-                    oob_tree_wrong_lam_sum[i] += lambdas[i];
-                    correctly_classified = false;
-                }
+            tree->train(*instance);
+            instance->setWeight(weight);
+        }
 
-                if (is_same_distribution) {
-                    if (correctly_classified) {
-                        if (oob_tree_correct_lam_sum[i] > 0) {
-                            lambdas[i] *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
-                        }
-                    } else {
-                        if (oob_tree_wrong_lam_sum[i] > 0) {
-                            lambdas[i] *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
-                        }
+        // boosting based on out-of-bag errors
+        if (k == 0) {
+            oob_tree_lam_sum[i] += lambda_d;
+            bool correctly_classified;
+            if (tree->predict(*instance, false) == instance->getLabel()) {
+                oob_tree_correct_lam_sum[i] += lambda_d;
+                correctly_classified = true;
+            } else {
+                oob_tree_wrong_lam_sum[i] += lambda_d;
+                correctly_classified = false;
+            }
+
+            // cout << "lambda_d: " << lambda_d << endl;
+            if (is_same_distribution) {
+                if (correctly_classified) {
+                    if (oob_tree_correct_lam_sum[i] > epsilon) {
+                        lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
                     }
                 } else {
-                    if (correctly_classified) {
-                        if (oob_tree_wrong_lam_sum[i] > 0) {
-                            lambdas[i] *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
-                        }
-                    } else {
-                        if (oob_tree_correct_lam_sum[i] > 0) {
-                            lambdas[i] *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
-                        }
+                    if (oob_tree_wrong_lam_sum[i] > epsilon) {
+                        lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
                     }
                 }
-
-                if (lambdas[i] == std::numeric_limits<float>::infinity()) {
-                    cout << "inf" << endl;
-                    cout << "oob_tree_correct_lam_sum: " <<  oob_tree_correct_lam_sum[i] << endl;
-                    cout << "oob_tree_wrong_lam_sum: " <<  oob_tree_wrong_lam_sum[i] << endl;
-                    exit(1);
+            } else {
+                if (correctly_classified) {
+                    if (oob_tree_wrong_lam_sum[i] > epsilon) {
+                        lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                    }
+                } else {
+                    if (oob_tree_correct_lam_sum[i] > epsilon) {
+                        lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                    }
                 }
+            }
+
+            if (lambda_d == std::numeric_limits<float>::infinity()) {
+                cout << "inf" << endl;
+                cout << "oob_tree_correct_lam_sum: " <<  oob_tree_correct_lam_sum[i] << endl;
+                cout << "oob_tree_wrong_lam_sum: " <<  oob_tree_wrong_lam_sum[i] << endl;
+                exit(1);
             }
         }
 
-        // cout << "lamb: ";
-        // for (auto l : lambdas) {
-        //     cout << l << " ";
-        // }
-        // cout << endl << "oobc: ";
-        // for (auto l : oob_tree_correct_lam_sum) {
-        //     cout << l << " ";
-        // }
-        // cout << endl << "oobw: ";
-        // for (auto l : oob_tree_wrong_lam_sum) {
-        //     cout << l << " ";
-        // }
-        // cout << endl;
+        cout << lambda_d << " ";
 
+        // if (lambda_d > 60835322454746) {
+        //     cout << endl;
+        //     cout << "correct: " << oob_tree_correct_lam_sum[i] << endl;
+        //     cout << "wrong: " << oob_tree_wrong_lam_sum[i] << endl;
+        //     cout << "total: " << oob_tree_lam_sum[i] << endl;
+        // }
     }
+    cout << endl;
+
+    // cout << "oobc: ";
+    // for (auto l : oob_tree_correct_lam_sum) {
+    //     cout << l << " ";
+    // }
+    // cout << endl << "oobw: ";
+    // for (auto l : oob_tree_wrong_lam_sum) {
+    //     cout << l << " ";
+    // }
+    // cout << endl;
+
 }
 
 double trans_pearl::boosted_bg_tree_pool::compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count) {
