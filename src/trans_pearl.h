@@ -81,7 +81,7 @@ private:
         // vector<double> best_perf_metrics_for_drifted_trees;
         // vector<vector<Instance*>> instance_stores;
         int evaluate_tree(shared_ptr<trans_pearl_tree> drifted_tree, vector<Instance*> &pseudo_instances);
-        void transfer(int i, Instance* instance);
+        bool transfer(int i, Instance* instance);
 
         double compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count);
 

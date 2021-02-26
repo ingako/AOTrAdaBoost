@@ -483,43 +483,60 @@ bool trans_pearl::has_actual_drifted_trees() {
     return actual_drifted_trees.size() > 0;
 }
 
-void trans_pearl::transfer(int i, Instance* instance) {
-    if (bbt_pools[i] != nullptr) {
-        bbt_pools[i]->online_tradaboost(instance, true);
-        if (bbt_pools[i]->matched_tree == nullptr) {
-            // During drift warning period
-            bbt_pools[i]->warning_period_instances.push_back(instance);
-        } else {
-            // After actual drift drift point, perform boosting with weight decrement
-            // TODO param
-            for (int j = 0; j < 30; j++) {
-                Instance* transfer_instance = bbt_pools[i]->get_next_diff_distr_instance();
-                if (transfer_instance != nullptr) {
-                    bbt_pools[i]->online_tradaboost(transfer_instance, false);
-                }
-            }
+bool trans_pearl::transfer(int i, Instance* instance) {
+    if (bbt_pools[i] == nullptr) {
+        return false;
+    }
 
-            // Attempt transfer
-            shared_ptr<pearl_tree> transfer_candidate = bbt_pools[i]->get_best_model(actual_labels,
-                                                                                     instance->getNumberClasses());
-            if (transfer_candidate != nullptr) {
-                shared_ptr<pearl_tree> foreground_tree = static_pointer_cast<pearl_tree>(foreground_trees[i]);
-                foreground_tree->update_kappa(actual_labels, instance->getNumberClasses());
-                if (transfer_candidate->kappa - foreground_tree->kappa >= 0.3
-                        && transfer_candidate->kappa >= 0.3) {
-                    transfer_candidate ->tree_pool_id = tree_pool.size();
-                    tree_pool.push_back(transfer_candidate);
+    bbt_pools[i]->online_tradaboost(instance, true);
+    if (bbt_pools[i]->matched_tree == nullptr) {
+        // During drift warning period
+        bbt_pools[i]->warning_period_instances.push_back(instance);
 
-                    foreground_trees[i] = transfer_candidate;
-                    transferred_tree_total_count += 1;
-                    bbt_pools[i] = nullptr; // TODO reduce overhead
-                    cout << "transferred tree kappa: " << transfer_candidate->kappa
-                         << " | "
-                         << "foreground tree kappa: " << foreground_tree->kappa << endl;
-                }
-            }
+        return false;
+    }
+
+    // After actual drift point, perform boosting with weight decrement
+    // TODO param
+    for (int j = 0; j < 30; j++) {
+        Instance* transfer_instance = bbt_pools[i]->get_next_diff_distr_instance();
+        if (transfer_instance != nullptr) {
+            bbt_pools[i]->online_tradaboost(transfer_instance, false);
         }
     }
+
+    // Attempt transfer
+    shared_ptr<pearl_tree> transfer_candidate = bbt_pools[i]->get_best_model(actual_labels,
+                                                                             instance->getNumberClasses());
+    if (transfer_candidate == nullptr) {
+        return false;
+    }
+
+    shared_ptr<pearl_tree> foreground_tree = static_pointer_cast<pearl_tree>(foreground_trees[i]);
+    foreground_tree->update_kappa(actual_labels, instance->getNumberClasses());
+
+    if (transfer_candidate->kappa - foreground_tree->kappa >= 0.3
+            && transfer_candidate->kappa >= 0.3) {
+
+        // Update PEARL related data structs
+        transfer_candidate->tree_pool_id = tree_pool.size();
+        tree_pool.push_back(transfer_candidate);
+        cur_state.erase(foreground_tree->tree_pool_id);
+        cur_state.insert(transfer_candidate->tree_pool_id);
+        if (enable_state_graph) {
+            state_graph->add_edge(foreground_tree->replaced_tree->tree_pool_id,
+                                  transfer_candidate->tree_pool_id);
+        }
+
+        foreground_trees[i] = transfer_candidate;
+        transferred_tree_total_count += 1;
+        bbt_pools[i] = nullptr; // TODO reduce overhead
+        cout << "transferred tree kappa: " << transfer_candidate->kappa
+             << " | "
+             << "foreground tree kappa: " << foreground_tree->kappa << endl;
+    }
+
+    return true;
 }
 
 shared_ptr<trans_pearl_tree> trans_pearl::match_concept(vector<Instance*> warning_period_instances) {
