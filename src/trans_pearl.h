@@ -44,7 +44,6 @@ class trans_pearl : public pearl {
         void set_expected_drift_prob(int tree_idx, double p);
         bool has_actual_drift(int tree_idx);
         void update_drifted_tree_indices(const vector<int>& tree_indices);
-        vector<int> get_stable_tree_indices();
 
         void select_predicted_trees(const vector<int>& warning_tree_pos_list);
 
@@ -63,23 +62,16 @@ class trans_pearl : public pearl {
 private:
 
         int num_instances_seen = 0;
-        deque<Instance*> backtrack_instances;
         set<int> potential_drifted_tree_indices;
         vector<unique_ptr<HT::ADWIN>> stability_detectors;
-        vector<int> stable_tree_indices;
         deque<shared_ptr<pearl_tree>> predicted_trees;
 
         static bool compare_kappa_arf(shared_ptr<arf_tree>& tree1,
                                           shared_ptr<arf_tree>& tree2);
-        // virtual void predict_with_state_adaption(vector<int>& votes, int actual_label);
         bool detect_stability(int error_count, unique_ptr<HT::ADWIN>& detector);
 
         // Transfer
         vector<vector<shared_ptr<pearl_tree>>*> registered_tree_pools;
-        vector<int> actual_drifted_trees;
-        vector<int> actual_drifted_trees_bg;
-        // vector<double> best_perf_metrics_for_drifted_trees;
-        // vector<vector<Instance*>> instance_stores;
         int evaluate_tree(shared_ptr<trans_pearl_tree> drifted_tree, vector<Instance*> &pseudo_instances);
         bool transfer(int i, Instance* instance);
 
@@ -89,9 +81,9 @@ private:
         int stream_instance_idx = 0;
         vector<int> drift_warning_period_lengths;
 
-        int least_transfer_warning_period_length = 50; // int pro_drift_window_size = 100;
-        int instance_store_size = 500; // double hybrid_delta = 0.001;
-        int num_pseudo_instances = 300; // int backtrack_window = 25;
+        int least_transfer_warning_period_length = 50;
+        int instance_store_size = 500;
+        int num_pseudo_instances = 300;
         int bbt_pool_size = 100;
         int mini_batch_size = 100;
         // one boosted background tree pool per foreground tree
@@ -113,8 +105,6 @@ private:
             vector<Instance*> warning_period_instances;
             shared_ptr<trans_pearl_tree> matched_tree = nullptr;
             int instance_store_idx = 0;
-
-            double compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count);
 
         private:
             double lambda = 1;

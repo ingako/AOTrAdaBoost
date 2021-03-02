@@ -60,9 +60,6 @@ void trans_pearl::init() {
     for (auto t : temp_tree_pool) {
         tree_pool.push_back(t);
     }
-
-    // scms.resize(num_trees, 0);
-    // swms.resize(num_trees, 0);
 }
 
 shared_ptr<pearl_tree> trans_pearl::make_pearl_tree(int tree_pool_id) {
@@ -77,10 +74,9 @@ shared_ptr<pearl_tree> trans_pearl::make_pearl_tree(int tree_pool_id) {
 // foreground trees make predictions, update votes, keep track of actual labels
 // find warning trees, select candidate trees
 // find drifted trees, update potential_drifted_tree_indices
-// candidate trees make predictions
+// candidate trees make predictions for performance evaluation
 void trans_pearl::train() {
     stream_instance_idx += 1;
-    actual_drifted_trees.clear();
 
     if (drift_warning_period_lengths.size() == 0) {
         drift_warning_period_lengths.resize(num_trees, -999);
@@ -91,9 +87,7 @@ void trans_pearl::train() {
     }
 
     potential_drifted_tree_indices.clear();
-    stable_tree_indices.clear();
 
-    backtrack_instances.push_back(instance);
     num_instances_seen++;
 
     int actual_label = instance->getLabel();
@@ -128,7 +122,6 @@ void trans_pearl::train() {
 
         cur_tree = static_pointer_cast<trans_pearl_tree>(foreground_trees[i]);
         cur_tree->train(*instance);
-        // DenseInstance* denseInstance = (DenseInstance*) instance;
         cur_tree->store_instance(instance);
         if (instance == nullptr) {
             cout << "train(): null instance" << endl;
@@ -152,7 +145,7 @@ void trans_pearl::train() {
         bool warning_detected_only = false;
         bool drift_detected = false;
 
-        // detect drift
+        // detect actual drift
         if (detect_change(error_count, cur_tree->drift_detector)) {
             drift_detected = true;
             drifted_tree_pos_list.push_back(i);
@@ -172,6 +165,7 @@ void trans_pearl::train() {
                     cout << "-------------------------------------warning_period_instances size is not enough: "
                          << i << ":"
                          << bbt_pools[i]->warning_period_instances.size() << endl;
+                    bbt_pools[i] = nullptr;
                  } else {
                     shared_ptr<trans_pearl_tree> matched_tree =
                             match_concept(bbt_pools[i]->warning_period_instances);
@@ -235,7 +229,7 @@ void trans_pearl::train() {
         // }
         // cout << endl;
 
-        actual_drifted_trees = adapt_state(drifted_tree_pos_list, candidate_trees);
+        adapt_state(drifted_tree_pos_list, candidate_trees);
     }
 }
 
@@ -443,14 +437,6 @@ bool trans_pearl::detect_stability(int error_count,
     }
 
     return false;
-}
-
-vector<int> trans_pearl::get_stable_tree_indices() {
-    return stable_tree_indices;
-}
-
-bool trans_pearl::has_actual_drifted_trees() {
-    return actual_drifted_trees.size() > 0;
 }
 
 bool trans_pearl::transfer(int i, Instance* instance) {
@@ -968,47 +954,4 @@ void trans_pearl::boosted_bg_tree_pool::boost(Instance* instance, bool is_same_d
     // }
     // cout << endl;
 
-}
-
-double trans_pearl::boosted_bg_tree_pool::compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count) {
-    // prepare confusion matrix
-    vector<vector<int>> confusion_matrix(class_count, vector<int>(class_count, 0));
-    int correct = 0;
-
-    for (int i = 0; i < predicted_labels.size(); i++) {
-        confusion_matrix[actual_labels[i]][predicted_labels[i]]++;
-        if (actual_labels[i] == predicted_labels[i]) {
-            correct++;
-        }
-    }
-
-    double accuracy = (double) correct / predicted_labels.size();
-
-    // computes the Cohen's kappa coefficient
-    int sample_count = predicted_labels.size();
-    double p0 = accuracy;
-    double pc = 0.0;
-    int row_count = class_count;
-    int col_count = class_count;
-
-
-    for (int i = 0; i < row_count; i++) {
-        double row_sum = 0;
-        for (int j = 0; j < col_count; j++) {
-            row_sum += confusion_matrix[i][j];
-        }
-
-        double col_sum = 0;
-        for (int j = 0; j < row_count; j++) {
-            col_sum += confusion_matrix[j][i];
-        }
-
-        pc += (row_sum / sample_count) * (col_sum / sample_count);
-    }
-
-    if (pc == 1) {
-        return 1;
-    }
-
-    return (p0 - pc) / (1.0 - pc);
 }
