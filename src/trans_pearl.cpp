@@ -444,6 +444,17 @@ bool trans_pearl::transfer(int i, Instance* instance) {
         return false;
     }
 
+    bool registered_tree_pools_have_concepts = false;
+    for (auto registered_tree_pool : registered_tree_pools) {
+        if (registered_tree_pool->size() != 0) {
+            registered_tree_pools_have_concepts = true;
+            break;
+        }
+    }
+    if (!registered_tree_pools_have_concepts) {
+        return false;
+    }
+
     bbt_pools[i]->online_tradaboost(instance, true);
     if (bbt_pools[i]->matched_tree == nullptr) {
         // During drift warning period
