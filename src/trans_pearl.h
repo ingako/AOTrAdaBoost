@@ -82,7 +82,6 @@ private:
         // vector<vector<Instance*>> instance_stores;
         int evaluate_tree(shared_ptr<trans_pearl_tree> drifted_tree, vector<Instance*> &pseudo_instances);
         bool transfer(int i, Instance* instance);
-        bool vanilla_transfer(vector<int> drifted_tree_pos_list);
 
         double compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count);
 
@@ -164,10 +163,6 @@ public:
     // 2. For generating data by using KNN
     deque<Instance*> instance_store;
     int instance_store_size;
-
-    // for vanilla transfer
-    vector<Instance*> warning_period_instances;
-    bool is_warning_period = false;
 
     void store_instance(Instance* instance);
 

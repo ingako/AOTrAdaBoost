@@ -118,7 +118,6 @@ void trans_pearl::train() {
             drift_warning_period_lengths[i]++;
         }
 
-        // TODO uncomment for transfer
         transfer(i, instance);
 
         // online bagging
@@ -143,11 +142,6 @@ void trans_pearl::train() {
             cout << "train(): null instance" << endl;
             exit(1);
         }
-
-        // TODO vanilla transfer
-        // if (cur_tree->is_warning_period) {
-        //     cur_tree->warning_period_instances.push_back(instance);
-        // }
 
         // if (cur_tree->instance_store.size() > 2000) {
         //     for (int idx = 0; idx < num_trees; idx++) {
@@ -180,7 +174,6 @@ void trans_pearl::train() {
                 drift_warning_period_lengths[i] = -999;
             }
 
-            // TODO uncomment for transfer
             if (bbt_pools[i] != nullptr) {
                 // TODO allow concept match after actual drift?
                 if (bbt_pools[i]->warning_period_instances.size() < least_transfer_warning_period_length) {
@@ -197,8 +190,6 @@ void trans_pearl::train() {
                     }
                 }
             }
-            // TODO vanilla transfer
-            // cur_tree->is_warning_period = true;
         }
 
         // detect warning
@@ -213,7 +204,6 @@ void trans_pearl::train() {
             if (!drift_detected) {
                 warning_detected_only = true;
 
-                // TODO uncomment for transfer
                 shared_ptr<trans_pearl_tree> tree_template
                         = static_pointer_cast<trans_pearl_tree>(cur_tree->bg_pearl_tree);
                 tree_template = std::make_shared<trans_pearl_tree>(*tree_template);
@@ -221,8 +211,6 @@ void trans_pearl::train() {
                                                                  mini_batch_size,
                                                                  tree_template,
                                                                  this->lambda);
-                // TODO vanilla transfer
-                // cur_tree->is_warning_period = false;
             }
         }
 
@@ -272,7 +260,6 @@ void trans_pearl::train() {
         // }
         // cout << endl;
 
-        // vanilla_transfer(drifted_tree_pos_list);
         actual_drifted_trees = adapt_state(drifted_tree_pos_list, candidate_trees);
     }
 }
@@ -545,54 +532,6 @@ bool trans_pearl::transfer(int i, Instance* instance) {
     }
 
     return true;
-}
-
-bool trans_pearl::vanilla_transfer(vector<int> drifted_tree_pos_list) {
-    for (auto drifted_tree_pos : drifted_tree_pos_list) {
-        auto foreground_tree = static_pointer_cast<trans_pearl_tree>(foreground_trees[drifted_tree_pos]);
-        if (foreground_tree->warning_period_instances.size() < least_transfer_warning_period_length) {
-            foreground_tree->warning_period_instances.clear();
-            continue;
-        }
-
-        shared_ptr<trans_pearl_tree> transfer_candidate =
-                match_concept(foreground_tree->warning_period_instances);
-        foreground_tree->warning_period_instances.clear();
-
-        if (transfer_candidate == nullptr) {
-            continue;
-        }
-
-        for (auto instance : foreground_tree->warning_period_instances) {
-            transfer_candidate->predict(*instance, true);
-        }
-        transfer_candidate->update_kappa(actual_labels, instance->getNumberClasses());
-        foreground_tree->update_kappa(actual_labels, instance->getNumberClasses());
-
-        cout << "transferred tree kappa: " << transfer_candidate->kappa
-             << " | "
-             << "foreground tree kappa: " << foreground_tree->kappa << endl;
-
-        if (transfer_candidate->kappa - foreground_tree->kappa >= 0.05
-            && transfer_candidate->kappa >= 0.05) {
-
-            // Update PEARL related data structs
-            transfer_candidate->tree_pool_id = tree_pool.size();
-            tree_pool.push_back(transfer_candidate);
-            cur_state.erase(foreground_tree->tree_pool_id);
-            cur_state.insert(transfer_candidate->tree_pool_id);
-            if (enable_state_graph) {
-                state_graph->add_edge(foreground_tree->tree_pool_id,
-                                      transfer_candidate->tree_pool_id);
-            }
-
-            foreground_trees[drifted_tree_pos] = transfer_candidate;
-            transferred_tree_total_count += 1;
-            cout << "transferred tree kappa: " << transfer_candidate->kappa
-                 << " | "
-                 << "foreground tree kappa: " << foreground_tree->kappa << endl;
-        }
-    }
 }
 
 shared_ptr<trans_pearl_tree> trans_pearl::match_concept(vector<Instance*> warning_period_instances) {
