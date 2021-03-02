@@ -126,7 +126,7 @@ private:
 
         private:
             double lambda = 1;
-            double epsilon = 0.1;
+            double epsilon = 1;
             std::mt19937 mrand;
 
             long pool_size = 10;

@@ -119,7 +119,7 @@ void trans_pearl::train() {
         }
 
         // TODO uncomment for transfer
-        // transfer(i, instance);
+        transfer(i, instance);
 
         // online bagging
         std::poisson_distribution<int> poisson_distr(lambda);
@@ -145,9 +145,9 @@ void trans_pearl::train() {
         }
 
         // TODO vanilla transfer
-        if (cur_tree->is_warning_period) {
-            cur_tree->warning_period_instances.push_back(instance);
-        }
+        // if (cur_tree->is_warning_period) {
+        //     cur_tree->warning_period_instances.push_back(instance);
+        // }
 
         // if (cur_tree->instance_store.size() > 2000) {
         //     for (int idx = 0; idx < num_trees; idx++) {
@@ -181,24 +181,24 @@ void trans_pearl::train() {
             }
 
             // TODO uncomment for transfer
-            // if (bbt_pools[i] != nullptr) {
-            //     // TODO allow concept match after actual drift?
-            //     if (bbt_pools[i]->warning_period_instances.size() < least_transfer_warning_period_length) {
-            //         cout << "-------------------------------------warning_period_instances size is not enough: "
-            //              << i << ":"
-            //              << bbt_pools[i]->warning_period_instances.size() << endl;
-            //      } else {
-            //         shared_ptr<trans_pearl_tree> matched_tree =
-            //                 match_concept(bbt_pools[i]->warning_period_instances);
-            //         if (matched_tree == nullptr) {
-            //             bbt_pools[i] == nullptr;
-            //         } else {
-            //             bbt_pools[i]->matched_tree = matched_tree;
-            //         }
-            //     }
-            // }
+            if (bbt_pools[i] != nullptr) {
+                // TODO allow concept match after actual drift?
+                if (bbt_pools[i]->warning_period_instances.size() < least_transfer_warning_period_length) {
+                    cout << "-------------------------------------warning_period_instances size is not enough: "
+                         << i << ":"
+                         << bbt_pools[i]->warning_period_instances.size() << endl;
+                 } else {
+                    shared_ptr<trans_pearl_tree> matched_tree =
+                            match_concept(bbt_pools[i]->warning_period_instances);
+                    if (matched_tree == nullptr) {
+                        bbt_pools[i] == nullptr;
+                    } else {
+                        bbt_pools[i]->matched_tree = matched_tree;
+                    }
+                }
+            }
             // TODO vanilla transfer
-            cur_tree->is_warning_period = true;
+            // cur_tree->is_warning_period = true;
         }
 
         // detect warning
@@ -214,15 +214,15 @@ void trans_pearl::train() {
                 warning_detected_only = true;
 
                 // TODO uncomment for transfer
-                // shared_ptr<trans_pearl_tree> tree_template
-                //         = static_pointer_cast<trans_pearl_tree>(cur_tree->bg_pearl_tree);
-                // tree_template = std::make_shared<trans_pearl_tree>(*tree_template);
-                // bbt_pools[i] = make_unique<boosted_bg_tree_pool>(bbt_pool_size,
-                //                                                  mini_batch_size,
-                //                                                  tree_template,
-                //                                                  this->lambda);
+                shared_ptr<trans_pearl_tree> tree_template
+                        = static_pointer_cast<trans_pearl_tree>(cur_tree->bg_pearl_tree);
+                tree_template = std::make_shared<trans_pearl_tree>(*tree_template);
+                bbt_pools[i] = make_unique<boosted_bg_tree_pool>(bbt_pool_size,
+                                                                 mini_batch_size,
+                                                                 tree_template,
+                                                                 this->lambda);
                 // TODO vanilla transfer
-                cur_tree->is_warning_period = false;
+                // cur_tree->is_warning_period = false;
             }
         }
 
@@ -272,7 +272,7 @@ void trans_pearl::train() {
         // }
         // cout << endl;
 
-        vanilla_transfer(drifted_tree_pos_list);
+        // vanilla_transfer(drifted_tree_pos_list);
         actual_drifted_trees = adapt_state(drifted_tree_pos_list, candidate_trees);
     }
 }
@@ -911,6 +911,7 @@ void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
     }
 
     this->boost(instance, is_same_distribution);
+    // this->non_boost(instance);
 
     if (is_same_distribution) {
         this->perf_eval(instance);
@@ -1031,21 +1032,21 @@ void trans_pearl::boosted_bg_tree_pool::boost(Instance* instance, bool is_same_d
             // cout << "lambda_d: " << lambda_d << endl;
             if (is_same_distribution) {
                 if (correctly_classified) {
-                    if (oob_tree_correct_lam_sum[i] > epsilon) {
+                    if (oob_tree_correct_lam_sum[i] >= epsilon) {
                         lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
                     }
                 } else {
-                    if (oob_tree_wrong_lam_sum[i] > epsilon) {
+                    if (oob_tree_wrong_lam_sum[i] >= epsilon) {
                         lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
                     }
                 }
             } else {
                 if (correctly_classified) {
-                    if (oob_tree_wrong_lam_sum[i] > epsilon) {
+                    if (oob_tree_wrong_lam_sum[i] >= epsilon) {
                         lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
                     }
                 } else {
-                    if (oob_tree_correct_lam_sum[i] > epsilon) {
+                    if (oob_tree_correct_lam_sum[i] >= epsilon) {
                         lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
                     }
                 }
