@@ -109,10 +109,6 @@ void trans_pearl::train() {
 
     shared_ptr<trans_pearl_tree> cur_tree = nullptr;
 
-    // ozaboost
-    // double lambda_d = this->lambda;
-    // training_weights_seen_by_model += 1; // TODO
-
     for (int i = 0; i < num_trees; i++) {
         if (drift_warning_period_lengths[i] > 0) {
             drift_warning_period_lengths[i]++;
@@ -123,10 +119,6 @@ void trans_pearl::train() {
         // online bagging
         std::poisson_distribution<int> poisson_distr(lambda);
         int weight = poisson_distr(mrand);
-
-        // ozaboost
-        // std::poisson_distribution<int> poisson_distr(lambda_d);
-        // int weight = poisson_distr(mrand);
 
         if (weight == 0) {
             continue;
@@ -218,23 +210,6 @@ void trans_pearl::train() {
             warning_tree_pos_list.push_back(i);
         }
 
-        // detect stability
-        // int correct_count = (int) (actual_label == predicted_label);
-        // if (cur_tree->replaced_tree
-        //     && detect_stability(correct_count, stability_detectors[i])) {
-        //     stability_detectors[i] = make_unique<HT::ADWIN>(stability_delta);
-        //     stable_tree_indices.push_back(i);
-        // }
-
-        // ozaboost: update weights
-        // if (error_count == 0) {
-        //     this->scms[i] += lambda_d;
-        //     lambda_d *= this->training_weights_seen_by_model / (2 * this->scms[i]);
-
-        // } else {
-        //     this->swms[i] += lambda_d;
-        //     lambda_d *= this->training_weights_seen_by_model / (2 * this->swms[i]);
-        // }
     }
 
     for (int i = 0; i < candidate_trees.size(); i++) {
@@ -636,33 +611,6 @@ void trans_pearl::register_tree_pool(vector<shared_ptr<pearl_tree>>& _tree_pool)
 vector<shared_ptr<pearl_tree>>& trans_pearl::get_concept_repo() {
     return this->tree_pool;
 }
-
-// ozaboost
-// double trans_pearl::getEnsembleMemberWeight(int i) {
-//     double em = this->swms[i] / (this->scms[i] + this->swms[i]);
-//     if ((em == 0.0) || (em > 0.5)) {
-//         return 0.0;
-//     }
-//     double Bm = em / (1.0 - em);
-//     return log(1.0 / Bm);
-// }
-
-// int trans_pearl::predict() {
-//     if (foreground_trees.empty()) {
-//         init();
-//     }
-//
-//     int num_classes = instance->getNumberClasses();
-//     vector<int> votes(num_classes, 0);
-//
-//     for (int i = 0; i < num_trees; i++) {
-//         int predicted_label = foreground_trees[i]->predict(*instance);
-//         votes[predicted_label] += getEnsembleMemberWeight(i);
-//     }
-//
-//     return vote(votes);
-// }
-
 
 // class trans_pearl_tree
 trans_pearl_tree::trans_pearl_tree(int tree_pool_id,

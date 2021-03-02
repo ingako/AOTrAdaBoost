@@ -85,13 +85,6 @@ private:
 
         double compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count);
 
-        // ozaboost
-        // vector<double> scms;
-        // vector<double> swms;
-        // long training_weights_seen_by_model = 0;
-        // double getEnsembleMemberWeight(int tree_idx);
-        // virtual int predict();
-
         // boosting for transfer learning
         int stream_instance_idx = 0;
         vector<int> drift_warning_period_lengths;
