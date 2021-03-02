@@ -83,10 +83,6 @@ bool trans_pearl_wrapper::get_next_instance() {
     return current_classifier->get_next_instance();
 }
 
-bool trans_pearl_wrapper::has_actual_drifted_trees() {
-    return current_classifier->has_actual_drifted_trees();
-}
-
 int trans_pearl_wrapper::get_candidate_tree_group_size() {
     return current_classifier->get_candidate_tree_group_size();
 }
