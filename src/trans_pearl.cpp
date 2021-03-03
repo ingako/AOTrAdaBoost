@@ -162,9 +162,9 @@ void trans_pearl::train() {
             if (bbt_pools[i] != nullptr) {
                 // TODO allow concept match after actual drift?
                 if (bbt_pools[i]->warning_period_instances.size() < least_transfer_warning_period_length) {
-                    cout << "-------------------------------------warning_period_instances size is not enough: "
-                         << i << ":"
-                         << bbt_pools[i]->warning_period_instances.size() << endl;
+                    // cout << "-------------------------------------warning_period_instances size is not enough: "
+                    //      << i << ":"
+                    //      << bbt_pools[i]->warning_period_instances.size() << endl;
                     bbt_pools[i] = nullptr;
                  } else {
                     shared_ptr<trans_pearl_tree> matched_tree =
@@ -783,19 +783,45 @@ trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(int pool_size,
         lambda(lambda) {
 
     mrand = std::mt19937(42);
+
+    // init BBT
+    if (boost_mode == no_boost_mode) {
+        update_bbt();
+    } else {
+        for (int i = 0; i < pool_size; i++) {
+            update_bbt();
+        }
+    }
 }
 
 void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
                                                           bool is_same_distribution) {
-    boost_count += 1;
-    if (boost_count % 100 == 0) {
-        for (int i = 0; i < 2; i++) {
-            update_bbt();
+    if (instance == nullptr) {
+        cout << "no_boost(): null instance" << endl;
+        exit(1);
+    }
+
+    // TODO eviction params
+    if (boost_mode != no_boost_mode) {
+        boost_count += 1;
+        if (boost_count % 100 == 0) {
+            for (int i = 0; i < 2; i++) {
+                update_bbt();
+            }
         }
     }
 
-    this->boost(instance, is_same_distribution);
-    // this->non_boost(instance);
+    switch(boost_mode) {
+        case no_boost_mode:
+            this->no_boost(instance);
+            break;
+        case otradaboost_mode:
+            this->otradaboost(instance, is_same_distribution);
+            break;
+        default:
+            cout << "Incorrect boost_mode" << endl;
+            exit(1);
+    }
 
     if (is_same_distribution) {
         this->perf_eval(instance);
@@ -849,31 +875,24 @@ void trans_pearl::boosted_bg_tree_pool::update_bbt() {
     }
 }
 
-void trans_pearl::boosted_bg_tree_pool::non_boost(Instance* instance) {
-    // TODO test non boosting scenario
-    for (int i = 0; i < pool.size(); i++) {
-        auto tree = pool[i];
+void trans_pearl::boosted_bg_tree_pool::no_boost(Instance* instance) {
+    // Only one tree exists in no_boost_mode
+    auto tree = pool[0];
 
-        // bagging
-        std::poisson_distribution<int> poisson_distr(lambda);
-        double k = poisson_distr(mrand);
+    // bagging
+    std::poisson_distribution<int> poisson_distr(lambda);
+    double k = poisson_distr(mrand);
 
-        double weight = instance->getWeight();
-        if (k > 0 && weight > 0) {
-            instance->setWeight(k * weight);
+    double weight = instance->getWeight();
+    if (k > 0 && weight > 0) {
+        instance->setWeight(k * weight);
 
-            if (instance == nullptr) {
-                cout << "boost(): null instance" << endl;
-                exit(1);
-            }
-
-            tree->train(*instance);
-            instance->setWeight(weight);
-        }
+        tree->train(*instance);
+        instance->setWeight(weight);
     }
 }
 
-void trans_pearl::boosted_bg_tree_pool::boost(Instance* instance, bool is_same_distribution) {
+void trans_pearl::boosted_bg_tree_pool::otradaboost(Instance* instance, bool is_same_distribution) {
     oob_tree_lam_sum.resize(pool.size(), 0);
     oob_tree_correct_lam_sum.resize(pool.size(), 0);
     oob_tree_wrong_lam_sum.resize(pool.size(), 0);
@@ -891,11 +910,6 @@ void trans_pearl::boosted_bg_tree_pool::boost(Instance* instance, bool is_same_d
         double weight = instance->getWeight();
         if (k > 0 && weight > 0) {
             instance->setWeight(k * weight);
-
-            if (instance == nullptr) {
-                cout << "boost(): null instance" << endl;
-                exit(1);
-            }
 
             tree->train(*instance);
             instance->setWeight(weight);

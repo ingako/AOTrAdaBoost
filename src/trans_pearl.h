@@ -106,6 +106,10 @@ private:
             shared_ptr<trans_pearl_tree> matched_tree = nullptr;
             int instance_store_idx = 0;
 
+            enum boost_mode { no_boost_mode, ozaboost_mode, tradaboost_mode, otradaboost_mode };
+            // boost_mode boost_mode = no_boost_mode;
+            boost_mode boost_mode = otradaboost_mode;
+
         private:
             double lambda = 1;
             double epsilon = 1;
@@ -116,7 +120,6 @@ private:
             long boost_count = 0;
             long mini_batch_size = 100;
             shared_ptr<trans_pearl_tree> tree_template;
-            vector<Instance*> mini_batch;
             vector<shared_ptr<trans_pearl_tree>> pool;
             vector<double> oob_tree_correct_lam_sum; // count of out-of-bag correctly predicted trees per instance
             vector<double> oob_tree_wrong_lam_sum; // count of out-of-bag incorrectly predicted trees per instance
@@ -124,8 +127,8 @@ private:
 
             // execute replacement strategies when the bbt pool is full
             void update_bbt();
-            void boost(Instance* instance, bool is_same_distribution);
-            void non_boost(Instance* instance);
+            void otradaboost(Instance* instance, bool is_same_distribution);
+            void no_boost(Instance* instance);
             void perf_eval(Instance* instance);
         };
 
