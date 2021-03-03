@@ -26,7 +26,8 @@ public:
                         int instance_store_size,
                         int num_pseudo_instances,
                         int bbt_pool_size,
-                        int mini_batch_size);
+                        int mini_batch_size,
+                        string boost_mode_str);
 
     void switch_classifier(int classifier_idx);
 

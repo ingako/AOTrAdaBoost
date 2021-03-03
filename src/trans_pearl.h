@@ -8,6 +8,7 @@ typedef Eigen::MatrixXd Matrix;
 typedef knn::Matrixi Matrixi;
 
 class trans_pearl_tree;
+enum boost_modes { no_boost_mode, ozaboost_mode, tradaboost_mode, otradaboost_mode };
 
 class trans_pearl : public pearl {
     class boosted_bg_tree_pool;
@@ -34,7 +35,8 @@ class trans_pearl : public pearl {
                   int instance_store_size,
                   int num_diff_distr_instances,
                   int bbt_pool_size, // tuning required
-                  int mini_batch_size);
+                  int mini_batch_size,
+                  string boost_mode_str);
 
 
         virtual void train();
@@ -82,6 +84,14 @@ private:
         int stream_instance_idx = 0;
         vector<int> drift_warning_period_lengths;
 
+        std::map<string, boost_modes> boost_mode_map =
+                {
+                        { "no_boost", no_boost_mode},
+                        { "ozaboost", ozaboost_mode },
+                        { "tradaboost", tradaboost_mode },
+                        { "otradaboost", otradaboost_mode },
+                };
+        boost_modes boost_mode = otradaboost_mode;
         int least_transfer_warning_period_length = 50;
         int instance_store_size = 500;
         int num_diff_distr_instances = 30;
@@ -92,7 +102,10 @@ private:
 
         class boosted_bg_tree_pool {
         public:
-            boosted_bg_tree_pool(int pool_size,
+            boost_modes boost_mode = otradaboost_mode;
+
+            boosted_bg_tree_pool(enum boost_modes boost_mode,
+                                 int pool_size,
                                  int mini_batch_size,
                                  shared_ptr<trans_pearl_tree> tree_template,
                                  int lambda);
@@ -106,12 +119,6 @@ private:
             vector<Instance*> warning_period_instances;
             shared_ptr<trans_pearl_tree> matched_tree = nullptr;
             int instance_store_idx = 0;
-
-            enum boost_mode { no_boost_mode, ozaboost_mode, tradaboost_mode, otradaboost_mode };
-            // boost_mode boost_mode = no_boost_mode;
-            // boost_mode boost_mode = ozaboost_mode;
-            // boost_mode boost_mode = tradaboost_mode;
-            boost_mode boost_mode = otradaboost_mode;
 
         private:
             double lambda = 1;

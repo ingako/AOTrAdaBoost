@@ -22,9 +22,10 @@ trans_pearl_wrapper::trans_pearl_wrapper(
                     int instance_store_size,
                     int num_diff_distr_instances,
                     int bbt_pool_size,
-                    int mini_batch_size) {
+                    int mini_batch_size,
+                    string boost_mode_str) {
 
-for (int i = 0; i < num_classifiers; i++) {
+    for (int i = 0; i < num_classifiers; i++) {
         shared_ptr<trans_pearl> classifier = make_shared<trans_pearl>(
                 num_trees,
                 max_num_candidate_trees,
@@ -45,8 +46,8 @@ for (int i = 0; i < num_classifiers; i++) {
                 instance_store_size,
                 num_diff_distr_instances,
                 bbt_pool_size,
-                mini_batch_size);
-
+                mini_batch_size,
+                boost_mode_str);
 
         classifiers.push_back(classifier);
     }

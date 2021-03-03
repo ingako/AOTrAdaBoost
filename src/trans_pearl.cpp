@@ -20,7 +20,8 @@ trans_pearl::trans_pearl(int num_trees,
                          int instance_store_size,
                          int num_diff_distr_instances,
                          int bbt_pool_size,
-                         int mini_batch_size):
+                         int mini_batch_size,
+                         string boost_mode_str):
         pearl(num_trees,
               max_num_candidate_trees,
               repo_size,
@@ -38,11 +39,17 @@ trans_pearl::trans_pearl(int num_trees,
               drift_delta,
               true,
               true),
-        least_transfer_warning_period_length(least_transfer_warning_period_instances_length), // 50 pro_drift_window_size(pro_drift_window_size),
+        least_transfer_warning_period_length(least_transfer_warning_period_instances_length),
         instance_store_size(instance_store_size),
         num_diff_distr_instances(num_diff_distr_instances),
         bbt_pool_size(bbt_pool_size),
         mini_batch_size(mini_batch_size) {
+
+    if (boost_mode_map.find(boost_mode_str) == boost_mode_map.end() ) {
+        cout << "Invalid boost mode" << endl;
+        exit(1);
+    }
+    this->boost_mode = boost_mode_map[boost_mode_str];
 
 }
 
@@ -193,10 +200,12 @@ void trans_pearl::train() {
                 shared_ptr<trans_pearl_tree> tree_template
                         = static_pointer_cast<trans_pearl_tree>(cur_tree->bg_pearl_tree);
                 tree_template = std::make_shared<trans_pearl_tree>(*tree_template);
-                bbt_pools[i] = make_unique<boosted_bg_tree_pool>(bbt_pool_size,
-                                                                 mini_batch_size,
-                                                                 tree_template,
-                                                                 this->lambda);
+                bbt_pools[i] = make_unique<boosted_bg_tree_pool>(
+                        boost_mode,
+                        bbt_pool_size,
+                        mini_batch_size,
+                        tree_template,
+                        this->lambda);
             }
         }
 
@@ -772,10 +781,13 @@ vector<DenseInstance*> trans_pearl_tree::find_k_closest_instances(DenseInstance*
 
 
 // class boosted_bg_tree_pool
-trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(int pool_size,
+trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(
+                     enum boost_modes boost_mode,
+                     int pool_size,
                      int mini_batch_size,
                      shared_ptr<trans_pearl_tree> tree_template,
                      int lambda):
+        boost_mode(boost_mode),
         mini_batch_size(mini_batch_size),
         pool_size(pool_size),
         tree_template(tree_template),
