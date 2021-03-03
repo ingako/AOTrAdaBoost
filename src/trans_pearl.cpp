@@ -783,6 +783,9 @@ trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(int pool_size,
         lambda(lambda) {
 
     mrand = std::mt19937(42);
+    oob_tree_lam_sum.resize(pool_size, 0);
+    oob_tree_correct_lam_sum.resize(pool_size, 0);
+    oob_tree_wrong_lam_sum.resize(pool_size, 0);
 
     // init BBT
     if (boost_mode == no_boost_mode) {
@@ -801,14 +804,18 @@ void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
         exit(1);
     }
 
-    // TODO eviction params
     if (boost_mode != no_boost_mode) {
+        // TODO eviction params
         boost_count += 1;
         if (boost_count % 100 == 0) {
             for (int i = 0; i < 1; i++) {
                 update_bbt();
             }
         }
+
+        std::fill(oob_tree_lam_sum.begin(), oob_tree_lam_sum.end(), 0);
+        std::fill(oob_tree_correct_lam_sum.begin(), oob_tree_correct_lam_sum.end(), 0);
+        std::fill(oob_tree_wrong_lam_sum.begin(), oob_tree_wrong_lam_sum.end(), 0);
     }
 
     switch(boost_mode) {
@@ -817,6 +824,9 @@ void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
             break;
         case ozaboost_mode:
             this->ozaboost(instance);
+            break;
+        case tradaboost_mode:
+            this->tradaboost(instance, is_same_distribution);
             break;
         case otradaboost_mode:
             this->otradaboost(instance, is_same_distribution);
@@ -896,9 +906,6 @@ void trans_pearl::boosted_bg_tree_pool::no_boost(Instance* instance) {
 }
 
 void trans_pearl::boosted_bg_tree_pool::ozaboost(Instance* instance) {
-    oob_tree_lam_sum.resize(pool.size(), 0);
-    oob_tree_correct_lam_sum.resize(pool.size(), 0);
-    oob_tree_wrong_lam_sum.resize(pool.size(), 0);
     double lambda_d = 1;
     instance->setWeight(1);
 
@@ -939,11 +946,61 @@ void trans_pearl::boosted_bg_tree_pool::ozaboost(Instance* instance) {
     }
 }
 
+void trans_pearl::boosted_bg_tree_pool::tradaboost(Instance* instance, bool is_same_distribution) {
+    double lambda_d = 1;
+    instance->setWeight(1);
+
+    for (int i = 0; i < pool.size(); i++) {
+        auto tree = pool[i];
+
+        // bagging
+        std::poisson_distribution<int> poisson_distr(lambda_d);
+        double k = poisson_distr(mrand);
+
+        double weight = instance->getWeight();
+        if (k > 0 && weight > 0) {
+            instance->setWeight(k * weight);
+
+            tree->train(*instance);
+            instance->setWeight(weight);
+        }
+
+        oob_tree_lam_sum[i] += lambda_d;
+        bool correctly_classified;
+        if (tree->predict(*instance, false) == instance->getLabel()) {
+            oob_tree_correct_lam_sum[i] += lambda_d;
+            correctly_classified = true;
+        } else {
+            oob_tree_wrong_lam_sum[i] += lambda_d;
+            correctly_classified = false;
+        }
+
+        if (is_same_distribution) {
+            if (correctly_classified) {
+                if (oob_tree_correct_lam_sum[i] >= epsilon) {
+                    lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                }
+            } else {
+                if (oob_tree_wrong_lam_sum[i] >= epsilon) {
+                    lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                }
+            }
+        } else {
+            if (correctly_classified) {
+                if (oob_tree_wrong_lam_sum[i] >= epsilon) {
+                    lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                }
+            } else {
+                if (oob_tree_correct_lam_sum[i] >= epsilon) {
+                    lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                }
+            }
+        }
+    }
+}
+
 
 void trans_pearl::boosted_bg_tree_pool::otradaboost(Instance* instance, bool is_same_distribution) {
-    oob_tree_lam_sum.resize(pool.size(), 0);
-    oob_tree_correct_lam_sum.resize(pool.size(), 0);
-    oob_tree_wrong_lam_sum.resize(pool.size(), 0);
     double lambda_d = 1;
     instance->setWeight(1);
 
@@ -998,12 +1055,12 @@ void trans_pearl::boosted_bg_tree_pool::otradaboost(Instance* instance, bool is_
                 }
             }
 
-            if (lambda_d == std::numeric_limits<float>::infinity()) {
-                cout << "inf" << endl;
-                cout << "oob_tree_correct_lam_sum: " <<  oob_tree_correct_lam_sum[i] << endl;
-                cout << "oob_tree_wrong_lam_sum: " <<  oob_tree_wrong_lam_sum[i] << endl;
-                exit(1);
-            }
+            // if (lambda_d == std::numeric_limits<float>::infinity()) {
+            //     cout << "inf" << endl;
+            //     cout << "oob_tree_correct_lam_sum: " <<  oob_tree_correct_lam_sum[i] << endl;
+            //     cout << "oob_tree_wrong_lam_sum: " <<  oob_tree_wrong_lam_sum[i] << endl;
+            //     exit(1);
+            // }
         }
 
         // cout << lambda_d << " ";
@@ -1013,6 +1070,7 @@ void trans_pearl::boosted_bg_tree_pool::otradaboost(Instance* instance, bool is_
         //     cout << "correct: " << oob_tree_correct_lam_sum[i] << endl;
         //     cout << "wrong: " << oob_tree_wrong_lam_sum[i] << endl;
         //     cout << "total: " << oob_tree_lam_sum[i] << endl;
+        //     exit(1);
         // }
     }
     // cout << endl;
