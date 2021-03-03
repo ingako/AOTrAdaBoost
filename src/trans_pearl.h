@@ -35,7 +35,7 @@ class trans_pearl : public pearl {
                   int instance_store_size,
                   int num_diff_distr_instances,
                   int bbt_pool_size, // tuning required
-                  int mini_batch_size,
+                  int eviction_interval,
                   string boost_mode_str);
 
 
@@ -96,7 +96,7 @@ private:
         int instance_store_size = 500;
         int num_diff_distr_instances = 30;
         int bbt_pool_size = 100;
-        int mini_batch_size = 100;
+        int eviction_interval = 100;
         // one boosted background tree pool per foreground tree
         vector<unique_ptr<boosted_bg_tree_pool>> bbt_pools;
 
@@ -106,7 +106,7 @@ private:
 
             boosted_bg_tree_pool(enum boost_modes boost_mode,
                                  int pool_size,
-                                 int mini_batch_size,
+                                 int eviction_interval,
                                  shared_ptr<trans_pearl_tree> tree_template,
                                  int lambda);
 
@@ -128,7 +128,7 @@ private:
             long pool_size = 10;
             long bbt_counter = 0;
             long boost_count = 0;
-            long mini_batch_size = 100;
+            long eviction_interval = 100;
             shared_ptr<trans_pearl_tree> tree_template;
             vector<shared_ptr<trans_pearl_tree>> pool;
             vector<double> oob_tree_correct_lam_sum; // count of out-of-bag correctly predicted trees per instance

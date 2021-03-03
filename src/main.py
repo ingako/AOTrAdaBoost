@@ -62,9 +62,9 @@ if __name__ == '__main__':
     parser.add_argument("--bbt_pool_size",
                         dest="bbt_pool_size", default=100, type=int,
                         help="The size of the background boosting tree pool")
-    parser.add_argument("--mini_batch_size",
-                        dest="mini_batch_size", default=100, type=int,
-                        help="Batch size of instances for boosting")
+    parser.add_argument("--eviction_interval",
+                        dest="eviction_interval", default=100, type=int,
+                        help="Eviction interval for boosting")
     parser.add_argument("--boost_mode",
                         dest="boost_mode", default="otradaboost", type=str,
                         help="no_boost, ozaboost, tradaboost, otradaboost")
@@ -216,7 +216,7 @@ if __name__ == '__main__':
     if args.transfer:
         result_directory = f"{result_directory}/transfer/" \
                            f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
-                           f"{args.num_diff_distr_instances}/{args.bbt_pool_size}/{args.mini_batch_size}/" \
+                           f"{args.num_diff_distr_instances}/{args.bbt_pool_size}/{args.eviction_interval}/" \
                            f"{args.boost_mode}"
 
     pathlib.Path(result_directory).mkdir(parents=True, exist_ok=True)
@@ -336,7 +336,7 @@ if __name__ == '__main__':
                                              args.instance_store_size,
                                              args.num_diff_distr_instances,
                                              args.bbt_pool_size,
-                                             args.mini_batch_size,
+                                             args.eviction_interval,
                                              args.boost_mode)
 
             # all_predicted_drift_locs, accepted_predicted_drift_locs = \

@@ -20,7 +20,7 @@ trans_pearl::trans_pearl(int num_trees,
                          int instance_store_size,
                          int num_diff_distr_instances,
                          int bbt_pool_size,
-                         int mini_batch_size,
+                         int eviction_interval,
                          string boost_mode_str):
         pearl(num_trees,
               max_num_candidate_trees,
@@ -43,7 +43,7 @@ trans_pearl::trans_pearl(int num_trees,
         instance_store_size(instance_store_size),
         num_diff_distr_instances(num_diff_distr_instances),
         bbt_pool_size(bbt_pool_size),
-        mini_batch_size(mini_batch_size) {
+        eviction_interval(eviction_interval) {
 
     if (boost_mode_map.find(boost_mode_str) == boost_mode_map.end() ) {
         cout << "Invalid boost mode" << endl;
@@ -203,7 +203,7 @@ void trans_pearl::train() {
                 bbt_pools[i] = make_unique<boosted_bg_tree_pool>(
                         boost_mode,
                         bbt_pool_size,
-                        mini_batch_size,
+                        eviction_interval,
                         tree_template,
                         this->lambda);
             }
@@ -784,11 +784,11 @@ vector<DenseInstance*> trans_pearl_tree::find_k_closest_instances(DenseInstance*
 trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(
                      enum boost_modes boost_mode,
                      int pool_size,
-                     int mini_batch_size,
+                     int eviction_interval,
                      shared_ptr<trans_pearl_tree> tree_template,
                      int lambda):
         boost_mode(boost_mode),
-        mini_batch_size(mini_batch_size),
+        eviction_interval(eviction_interval),
         pool_size(pool_size),
         tree_template(tree_template),
         lambda(lambda) {
@@ -816,9 +816,9 @@ void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
     }
 
     if (boost_mode != no_boost_mode) {
-        // TODO eviction params
         boost_count += 1;
-        if (boost_count % 100 == 0) {
+        if (boost_count % eviction_interval == 0) {
+            // TODO num of tree eviction param?
             for (int i = 0; i < 1; i++) {
                 update_bbt();
             }

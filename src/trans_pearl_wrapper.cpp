@@ -22,7 +22,7 @@ trans_pearl_wrapper::trans_pearl_wrapper(
                     int instance_store_size,
                     int num_diff_distr_instances,
                     int bbt_pool_size,
-                    int mini_batch_size,
+                    int eviction_interval,
                     string boost_mode_str) {
 
     for (int i = 0; i < num_classifiers; i++) {
@@ -46,7 +46,7 @@ trans_pearl_wrapper::trans_pearl_wrapper(
                 instance_store_size,
                 num_diff_distr_instances,
                 bbt_pool_size,
-                mini_batch_size,
+                eviction_interval,
                 boost_mode_str);
 
         classifiers.push_back(classifier);
