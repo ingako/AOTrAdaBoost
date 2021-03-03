@@ -20,7 +20,7 @@ trans_pearl_wrapper::trans_pearl_wrapper(
                     double drift_delta,
                     int least_transfer_warning_period_instances_length,
                     int instance_store_size,
-                    int num_pseudo_instances,
+                    int num_diff_distr_instances,
                     int bbt_pool_size,
                     int mini_batch_size) {
 
@@ -43,7 +43,7 @@ for (int i = 0; i < num_classifiers; i++) {
                 drift_delta,
                 least_transfer_warning_period_instances_length,
                 instance_store_size,
-                num_pseudo_instances,
+                num_diff_distr_instances,
                 bbt_pool_size,
                 mini_batch_size);
 
@@ -94,4 +94,3 @@ int trans_pearl_wrapper::get_transferred_tree_group_size() {
 int trans_pearl_wrapper::get_tree_pool_size() {
     return current_classifier->get_tree_pool_size();
 }
-

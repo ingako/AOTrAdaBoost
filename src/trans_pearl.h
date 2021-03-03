@@ -29,10 +29,11 @@ class trans_pearl : public pearl {
                   double reuse_rate_upper_bound,
                   double warning_delta,
                   double drift_delta,
-                  int least_transfer_warning_period_instances_length,
+                  // transfer learning params
+                  int least_transfer_warning_period_instances_length, // tuning required
                   int instance_store_size,
-                  int num_pseudo_instances,
-                  int bbt_pool_size,
+                  int num_diff_distr_instances,
+                  int bbt_pool_size, // tuning required
                   int mini_batch_size);
 
 
@@ -83,7 +84,7 @@ private:
 
         int least_transfer_warning_period_length = 50;
         int instance_store_size = 500;
-        int num_pseudo_instances = 300;
+        int num_diff_distr_instances = 30;
         int bbt_pool_size = 100;
         int mini_batch_size = 100;
         // one boosted background tree pool per foreground tree

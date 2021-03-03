@@ -19,7 +19,8 @@ if path not in sys.path:
     sys.path.append(path)
 
 from ctypes import *
-libc = cdll.LoadLibrary("cmake-build-debug/trans_pearl_wrapper.cpython-37m-darwin.so")
+# libc = cdll.LoadLibrary("cmake-build-debug/trans_pearl_wrapper.cpython-37m-darwin.so")
+libc = cdll.LoadLibrary("cmake-build-debug-remote/trans_pearl_wrapper.cpython-37m-x86_64-linux-gnu.so")
 
 # from build.trans_pearl import adaptive_random_forest, pearl, trans_pearl
 # from trans_pearl import adaptive_random_forest, pearl, trans_pearl
@@ -55,9 +56,9 @@ if __name__ == '__main__':
     parser.add_argument("--instance_store_size",
                         dest="instance_store_size", default=500, type=int,
                         help="Number of instances stored in each tree for generating pseudo data with KNN")
-    parser.add_argument("--num_pseudo_instances",
-                        dest="num_pseudo_instances", default=300, type=int,
-                        help="number of pseudo instances to generate for transfer learning")
+    parser.add_argument("--num_diff_distr_instances",
+                        dest="num_diff_distr_instances", default=30, type=int,
+                        help="number of instances from the matched tree to generate for transfer learning")
     parser.add_argument("--bbt_pool_size",
                         dest="bbt_pool_size", default=100, type=int,
                         help="The size of the background boosting tree pool")
@@ -212,7 +213,7 @@ if __name__ == '__main__':
     if args.transfer:
         result_directory = f"{result_directory}/transfer/" \
                            f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
-                           f"{args.num_pseudo_instances}/{args.bbt_pool_size}/{args.mini_batch_size}"
+                           f"{args.num_diff_distr_instances}/{args.bbt_pool_size}/{args.mini_batch_size}"
 
     pathlib.Path(result_directory).mkdir(parents=True, exist_ok=True)
 
@@ -329,7 +330,7 @@ if __name__ == '__main__':
                                              args.drift_delta,
                                              args.least_transfer_warning_period_instances_length,
                                              args.instance_store_size,
-                                             args.num_pseudo_instances,
+                                             args.num_diff_distr_instances,
                                              args.bbt_pool_size,
                                              args.mini_batch_size)
 

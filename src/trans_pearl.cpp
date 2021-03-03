@@ -18,7 +18,7 @@ trans_pearl::trans_pearl(int num_trees,
                          // transfer learning params
                          int least_transfer_warning_period_instances_length,
                          int instance_store_size,
-                         int num_pseudo_instances,
+                         int num_diff_distr_instances,
                          int bbt_pool_size,
                          int mini_batch_size):
         pearl(num_trees,
@@ -40,7 +40,7 @@ trans_pearl::trans_pearl(int num_trees,
               true),
         least_transfer_warning_period_length(least_transfer_warning_period_instances_length), // 50 pro_drift_window_size(pro_drift_window_size),
         instance_store_size(instance_store_size),
-        num_pseudo_instances(num_pseudo_instances),
+        num_diff_distr_instances(num_diff_distr_instances),
         bbt_pool_size(bbt_pool_size),
         mini_batch_size(mini_batch_size) {
 
@@ -464,8 +464,7 @@ bool trans_pearl::transfer(int i, Instance* instance) {
     }
 
     // After actual drift point, perform boosting with weight decrement
-    // TODO param
-    for (int j = 0; j < 30; j++) {
+    for (int j = 0; j < num_diff_distr_instances; j++) {
         Instance* transfer_instance = bbt_pools[i]->get_next_diff_distr_instance();
         if (transfer_instance != nullptr) {
             bbt_pools[i]->online_tradaboost(transfer_instance, false);
