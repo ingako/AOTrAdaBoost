@@ -23,6 +23,7 @@ trans_pearl_wrapper::trans_pearl_wrapper(
                     int num_diff_distr_instances,
                     int bbt_pool_size,
                     int eviction_interval,
+                    double transfer_kappa_threshold,
                     string boost_mode_str) {
 
     for (int i = 0; i < num_classifiers; i++) {
@@ -47,6 +48,7 @@ trans_pearl_wrapper::trans_pearl_wrapper(
                 num_diff_distr_instances,
                 bbt_pool_size,
                 eviction_interval,
+                transfer_kappa_threshold,
                 boost_mode_str);
 
         classifiers.push_back(classifier);

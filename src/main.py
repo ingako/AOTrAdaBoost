@@ -65,6 +65,9 @@ if __name__ == '__main__':
     parser.add_argument("--eviction_interval",
                         dest="eviction_interval", default=100, type=int,
                         help="Eviction interval for boosting")
+    parser.add_argument("--transfer_kappa_threshold",
+                        dest="transfer_kappa_threshold", default=0.3, type=float,
+                        help="Kappa threshold for swapping foregournd tree with transfer tree")
     parser.add_argument("--boost_mode",
                         dest="boost_mode", default="otradaboost", type=str,
                         help="no_boost, ozaboost, tradaboost, otradaboost")
@@ -217,7 +220,7 @@ if __name__ == '__main__':
         result_directory = f"{result_directory}/transfer/" \
                            f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
                            f"{args.num_diff_distr_instances}/{args.bbt_pool_size}/{args.eviction_interval}/" \
-                           f"{args.boost_mode}"
+                           f"{args.transfer_kappa_threshold}/{args.boost_mode}"
 
     pathlib.Path(result_directory).mkdir(parents=True, exist_ok=True)
 
@@ -337,6 +340,7 @@ if __name__ == '__main__':
                                              args.num_diff_distr_instances,
                                              args.bbt_pool_size,
                                              args.eviction_interval,
+                                             args.transfer_kappa_threshold,
                                              args.boost_mode)
 
             # all_predicted_drift_locs, accepted_predicted_drift_locs = \

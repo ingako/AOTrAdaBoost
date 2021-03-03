@@ -21,6 +21,7 @@ trans_pearl::trans_pearl(int num_trees,
                          int num_diff_distr_instances,
                          int bbt_pool_size,
                          int eviction_interval,
+                         double transfer_kappa_threshold,
                          string boost_mode_str):
         pearl(num_trees,
               max_num_candidate_trees,
@@ -43,7 +44,8 @@ trans_pearl::trans_pearl(int num_trees,
         instance_store_size(instance_store_size),
         num_diff_distr_instances(num_diff_distr_instances),
         bbt_pool_size(bbt_pool_size),
-        eviction_interval(eviction_interval) {
+        eviction_interval(eviction_interval),
+        transfer_kappa_threshold(transfer_kappa_threshold) {
 
     if (boost_mode_map.find(boost_mode_str) == boost_mode_map.end() ) {
         cout << "Invalid boost mode" << endl;
@@ -204,6 +206,7 @@ void trans_pearl::train() {
                         boost_mode,
                         bbt_pool_size,
                         eviction_interval,
+                        transfer_kappa_threshold,
                         tree_template,
                         this->lambda);
             }
@@ -490,8 +493,8 @@ bool trans_pearl::transfer(int i, Instance* instance) {
     shared_ptr<pearl_tree> foreground_tree = static_pointer_cast<pearl_tree>(foreground_trees[i]);
     foreground_tree->update_kappa(actual_labels, instance->getNumberClasses());
 
-    if (transfer_candidate->kappa - foreground_tree->kappa >= 0.3
-            && transfer_candidate->kappa >= 0.3) {
+    if (transfer_candidate->kappa - foreground_tree->kappa >= transfer_kappa_threshold
+            && transfer_candidate->kappa >= transfer_kappa_threshold) {
 
         // Update PEARL related data structs
         transfer_candidate->tree_pool_id = tree_pool.size();
@@ -785,10 +788,12 @@ trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(
                      enum boost_modes boost_mode,
                      int pool_size,
                      int eviction_interval,
+                     double transfer_kappa_threshold,
                      shared_ptr<trans_pearl_tree> tree_template,
                      int lambda):
         boost_mode(boost_mode),
         eviction_interval(eviction_interval),
+        transfer_kappa_threshold(transfer_kappa_threshold),
         pool_size(pool_size),
         tree_template(tree_template),
         lambda(lambda) {
@@ -880,7 +885,7 @@ shared_ptr<pearl_tree> trans_pearl::boosted_bg_tree_pool::get_best_model(deque<i
         }
     }
 
-    if (highest_kappa >= 0.3) {
+    if (highest_kappa >= transfer_kappa_threshold) {
         cout << "------------------------------pool_pos_idx: " << pool_pos_idx << endl;
     }
 

@@ -126,6 +126,7 @@ PYBIND11_MODULE(trans_pearl_wrapper, m) {
                         int,
                         int,
                         int,
+                        double,
                         string>())
                 .def("switch_classifier", &trans_pearl_wrapper::switch_classifier)
                 .def("train", &trans_pearl_wrapper::train)
