@@ -108,6 +108,7 @@ private:
 
             enum boost_mode { no_boost_mode, ozaboost_mode, tradaboost_mode, otradaboost_mode };
             // boost_mode boost_mode = no_boost_mode;
+            // boost_mode boost_mode = ozaboost_mode;
             boost_mode boost_mode = otradaboost_mode;
 
         private:
@@ -127,8 +128,9 @@ private:
 
             // execute replacement strategies when the bbt pool is full
             void update_bbt();
-            void otradaboost(Instance* instance, bool is_same_distribution);
             void no_boost(Instance* instance);
+            void ozaboost(Instance* instance);
+            void otradaboost(Instance* instance, bool is_same_distribution);
             void perf_eval(Instance* instance);
         };
 
