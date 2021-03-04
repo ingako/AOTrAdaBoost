@@ -49,7 +49,10 @@ if __name__ == '__main__':
     parser.set_defaults(transfer=False)
     parser.add_argument("--transfer_streams",
                         dest="transfer_streams", default="", type=str,
-                        help="stream prefix for transfer learning")
+                        help="Data stream paths for transfer learning")
+    parser.add_argument("--exp_code",
+                        dest="exp_code", default="", type=str,
+                        help="Experiment code for result logging path")
     parser.add_argument("--least_transfer_warning_period_instances_length",
                         dest="least_transfer_warning_period_instances_length", default=50, type=int,
                         help="The least number of warning period instances needed to perform transfer learning")
@@ -167,6 +170,14 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    # other params for arf/pearl
+    arf_max_features = -1
+    num_features = -1
+
+    repo_size = args.num_trees * 1600
+    np.random.seed(args.random_state)
+    random.seed(0)
+
     if args.reuse_rate_upper_bound < args.reuse_rate_lower_bound:
         exit("reuse rate upper bound must be greater than or equal to the lower bound")
 
@@ -175,101 +186,54 @@ if __name__ == '__main__':
 
     # prepare data
     if args.is_generated_data:
-        data_file_dir = f"data/{args.generator_name}/" \
-                        f"{args.generator_traits}/"
-
-        data_file_path = ""
-        if args.transfer:
-            for seed in args.transfer_streams.split(";"):
-                print(f"seed: {seed}")
-                data_file_path += f"{data_file_dir}/{seed}.{args.data_format};"
-            data_file_path = data_file_path[:-1]
-            print(f"data_file_path: {data_file_path}")
-            # e.g /root/transfer/data/agrawal/abrupt/0.arff;/root/transfer/data/agrawal/abrupt/0.arff"
-
-        else:
-            data_file_path = f"{data_file_dir}/{args.generator_seed}.{args.data_format}"
-        result_directory = f"{args.generator_name}/{args.generator_traits}/"
+        data_file_dir = f"data/{args.exp_code}/"
+        data_file_path = args.transfer_streams
+        result_directory = f"{args.exp_code}/"
 
     else:
+        # TODO
         data_file_dir = f"../data/" \
                          f"{args.dataset_name}/"
         data_file_path = f"{data_file_dir}/{args.dataset_name}.{args.data_format}"
         result_directory = args.dataset_name
 
+    # set result logging directory for all streams
+    if args.transfer:
+        result_directory = f"{result_directory}/transfer-pearl/" \
+                           f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
+                           f"{args.num_diff_distr_instances}/{args.eviction_interval}/" \
+                           f"{args.transfer_kappa_threshold}/{args.bbt_pool_size}/" \
+                           f"{args.boost_mode}/{args.generator_seed}/"
+    else:
+        result_directory = f"{result_directory}/pearl/{args.generator_seed}/"
+
+    pathlib.Path(result_directory).mkdir(parents=True, exist_ok=True)
+
+    print(f"Preparing streams from files {data_file_path}...")
     for file_path in data_file_path.split(";"):
         if not os.path.isfile(file_path):
             print(f"Cannot locate file at {file_path}")
             exit()
 
-    print(f"Preparing stream from file {data_file_path}...")
+    # prepare transfer sequences
+    stream_sequences_file_path = f"{data_file_dir}/sequence.txt"
+    stream_sequences = deque()
+    with open(f"{stream_sequences_file_path}", 'r') as f:
+        for line in f:
+            stream_sequences.append([int(v) for v in line.split()])
 
-
-    if args.enable_state_graph:
-        result_directory = f"{result_directory}/" \
-                           f"k{args.cd_kappa_threshold}-e{args.edit_distance_threshold}/" \
-                           f"r{args.reuse_rate_upper_bound}-r{args.reuse_rate_lower_bound}-" \
-                           f"w{args.reuse_window_size}/" \
-                           f"lossy-{args.lossy_window_size}"
-
-    elif args.enable_state_adaption:
-        result_directory = f"{result_directory}/" \
-                           f"k{args.cd_kappa_threshold}-e{args.edit_distance_threshold}/"
-
-    if args.transfer:
-        result_directory = f"{result_directory}/transfer/" \
-                           f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
-                           f"{args.num_diff_distr_instances}/{args.bbt_pool_size}/{args.eviction_interval}/" \
-                           f"{args.transfer_kappa_threshold}/{args.boost_mode}"
-
-    pathlib.Path(result_directory).mkdir(parents=True, exist_ok=True)
-
-    metric_output_file = "result"
-    if args.transfer:
+    # prepare metrics loggers for each stream
+    metrics_loggers = []
+    for idx in range(len(data_file_path.split(";"))):
         metric_output_file = f"{result_directory}/" \
-                             f"{metric_output_file}-pro-{args.generator_seed}-{args.poisson_lambda}.csv"
-    else:
-        metric_output_file = f"{result_directory}/" \
-                             f"{metric_output_file}-{args.generator_seed}-{args.poisson_lambda}.csv"
+                             f"result-stream-{idx}.csv"
+        print(metric_output_file)
+        metrics_logger = setup_logger(f'metrics-{idx}', metric_output_file)
+        metrics_logger.info("count,accuracy,kappa,candidate_tree_size,transferred_tree_count,tree_pool_size,time")
+        metrics_loggers.append(metrics_logger)
 
-
-    configs = (
-        f"metric_output_file: {metric_output_file}\n"
-        f"warning_delta: {args.warning_delta}\n"
-        f"drift_delta: {args.drift_delta}\n"
-        f"max_samples: {args.max_samples}\n"
-        f"sample_freq: {args.sample_freq}\n"
-        f"kappa_window: {args.kappa_window}\n"
-        f"random_state: {args.random_state}\n"
-        f"enable_state_adaption: {args.enable_state_adaption}\n"
-        f"enable_state_graph: {args.enable_state_graph}\n")
-
-    print(configs)
-    with open(f"{result_directory}/config", 'w') as out:
-        out.write(configs)
-        out.flush()
-
-    # other params for pearl/propearl
-    arf_max_features = -1
-    num_features = -1
-
-    # repo_size = args.num_trees * 160
-    repo_size = args.num_trees * 1600
-    np.random.seed(args.random_state)
-    random.seed(0)
-
-    if args.enable_state_adaption:
-        with open(f"{result_directory}/reuse-rate-{args.generator_seed}.log", 'w') as out:
-            out.write("background_window_count,candidate_window_count,reuse_rate\n")
-
-    metrics_logger = setup_logger('metrics', metric_output_file)
-    metrics_logger.info("count,accuracy,kappa,candidate_tree_size,tree_pool_size,time")
-
-    process_logger = setup_logger('process', f'{result_directory}/processes-{args.generator_seed}.info')
-    seq_logger = setup_logger('seq', f'{result_directory}/seq-pro-{args.generator_seed}.log')
-
+    # TODO
     acc_per_drift_logger = setup_logger('acc_per_drift', f'{result_directory}/acc-per-drift-{args.generator_seed}.log')
-
 
     expected_drift_locs = None
     if args.is_generated_data:
@@ -280,120 +244,84 @@ if __name__ == '__main__':
             for line in f:
                 expected_drift_locs.append(int(line))
 
+
     if args.transfer:
-        stream_sequences_file_path = f"{data_file_dir}/sequence.txt"
+        classifier = trans_pearl_wrapper(len(data_file_path.split(";")),
+                                         args.num_trees,
+                                         args.max_num_candidate_trees,
+                                         repo_size,
+                                         args.edit_distance_threshold,
+                                         args.kappa_window,
+                                         args.lossy_window_size,
+                                         args.reuse_window_size,
+                                         arf_max_features,
+                                         args.poisson_lambda,
+                                         args.random_state,
+                                         args.bg_kappa_threshold,
+                                         args.cd_kappa_threshold,
+                                         args.reuse_rate_upper_bound,
+                                         args.warning_delta,
+                                         args.drift_delta,
+                                         args.least_transfer_warning_period_instances_length,
+                                         args.instance_store_size,
+                                         args.num_diff_distr_instances,
+                                         args.bbt_pool_size,
+                                         args.eviction_interval,
+                                         args.transfer_kappa_threshold,
+                                         args.boost_mode)
 
+        # all_predicted_drift_locs, accepted_predicted_drift_locs = \
+        evaluator = Evaluator()
+        evaluator.prequential_evaluation_transfer(
+            classifier=classifier,
+            data_file_paths=data_file_path.split(";"),
+            max_samples=args.max_samples,
+            sample_freq=args.sample_freq,
+            metrics_loggers=metrics_loggers,
+            expected_drift_locs=expected_drift_locs,
+            acc_per_drift_logger=acc_per_drift_logger,
+            stream_sequences=stream_sequences)
 
-    if not args.enable_state_adaption and not args.enable_state_graph:
-        print("init adaptive_random_forest")
-        pearl = adaptive_random_forest(args.num_trees,
-                                       arf_max_features,
-                                       args.poisson_lambda,
-                                       args.random_state,
-                                       args.warning_delta,
-                                       args.drift_delta)
-        eval_func = Evaluator.prequential_evaluation
+        # accepted_predicted_drifts_log_file = \
+        #     f"{result_directory}/accepted-predicted-drifts-{args.generator_seed}.log"
+        # all_predicted_drifts_log_file = \
+        #     f"{result_directory}/all-predicted-drifts-{args.generator_seed}.log"
 
-        Evaluator.prequential_evaluation(
-                classifier=pearl,
-                stream=data_file_path,
-                max_samples=args.max_samples,
-                sample_freq=args.sample_freq,
-                metrics_logger=metrics_logger,
-                expected_drift_locs=expected_drift_locs,
-                acc_per_drift_logger=acc_per_drift_logger)
+        # with open(accepted_predicted_drifts_log_file, "w") as accepted_f, \
+        #         open(all_predicted_drifts_log_file, "w") as all_f:
+        #     for i in range(args.num_trees):
+        #         accepted_f.write(",".join([str(v) for v in accepted_predicted_drift_locs[i]]))
+        #         accepted_f.write("\n")
+
+        #         all_f.write(",".join([str(v) for v in all_predicted_drift_locs[i]]))
+        #         all_f.write("\n")
+
     else:
-        if args.transfer:
-            stream_sequences = deque()
-
-            with open(f"{stream_sequences_file_path}", 'r') as f:
-                for line in f:
-                    stream_sequences.append([int(v) for v in line.split()])
-
-            metrics_loggers = []
-            for idx in range(len(data_file_path.split(";"))):
-                metric_output_file = f"{result_directory}/" \
-                                     f"result-{args.generator_seed}-stream-{idx}.csv"
-                print(metric_output_file)
-                metrics_logger = setup_logger(f'metrics-{idx}', metric_output_file)
-                metrics_logger.info("count,accuracy,kappa,candidate_tree_size,transferred_tree_count,tree_pool_size,time")
-                metrics_loggers.append(metrics_logger)
-
-            classifier = trans_pearl_wrapper(len(data_file_path.split(";")),
-                                             args.num_trees,
-                                             args.max_num_candidate_trees,
-                                             repo_size,
-                                             args.edit_distance_threshold,
-                                             args.kappa_window,
-                                             args.lossy_window_size,
-                                             args.reuse_window_size,
-                                             arf_max_features,
-                                             args.poisson_lambda,
-                                             args.random_state,
-                                             args.bg_kappa_threshold,
-                                             args.cd_kappa_threshold,
-                                             args.reuse_rate_upper_bound,
-                                             args.warning_delta,
-                                             args.drift_delta,
-                                             args.least_transfer_warning_period_instances_length,
-                                             args.instance_store_size,
-                                             args.num_diff_distr_instances,
-                                             args.bbt_pool_size,
-                                             args.eviction_interval,
-                                             args.transfer_kappa_threshold,
-                                             args.boost_mode)
-
-            # all_predicted_drift_locs, accepted_predicted_drift_locs = \
-            evaluator = Evaluator()
-            evaluator.prequential_evaluation_transfer(
-                classifier=classifier,
-                data_file_paths=data_file_path.split(";"),
-                max_samples=args.max_samples,
-                sample_freq=args.sample_freq,
-                metrics_loggers=metrics_loggers,
-                seq_logger=seq_logger,
-                expected_drift_locs=expected_drift_locs,
-                acc_per_drift_logger=acc_per_drift_logger,
-                stream_sequences=stream_sequences)
-
-            # accepted_predicted_drifts_log_file = \
-            #     f"{result_directory}/accepted-predicted-drifts-{args.generator_seed}.log"
-            # all_predicted_drifts_log_file = \
-            #     f"{result_directory}/all-predicted-drifts-{args.generator_seed}.log"
-
-            # with open(accepted_predicted_drifts_log_file, "w") as accepted_f, \
-            #         open(all_predicted_drifts_log_file, "w") as all_f:
-            #     for i in range(args.num_trees):
-            #         accepted_f.write(",".join([str(v) for v in accepted_predicted_drift_locs[i]]))
-            #         accepted_f.write("\n")
-
-            #         all_f.write(",".join([str(v) for v in all_predicted_drift_locs[i]]))
-            #         all_f.write("\n")
-
-        else:
-            pearl = pearl(args.num_trees,
-                          args.max_num_candidate_trees,
-                          repo_size,
-                          args.edit_distance_threshold,
-                          args.kappa_window,
-                          args.lossy_window_size,
-                          args.reuse_window_size,
-                          arf_max_features,
-                          args.poisson_lambda,
-                          args.random_state,
-                          args.bg_kappa_threshold,
-                          args.cd_kappa_threshold,
-                          args.reuse_rate_upper_bound,
-                          args.warning_delta,
-                          args.drift_delta,
-                          args.enable_state_adaption,
-                          args.enable_state_graph)
-            evaluator = Evaluator()
-            evaluator.prequential_evaluation(
-                    classifier=pearl,
-                    stream=data_file_path,
-                    max_samples=args.max_samples,
-                    sample_freq=args.sample_freq,
-                    metrics_logger=metrics_logger,
-                    expected_drift_locs=expected_drift_locs,
-                    acc_per_drift_logger=acc_per_drift_logger)
+        # TODO
+        print("main.py: init pearl")
+        # pearl = pearl(args.num_trees,
+        #               args.max_num_candidate_trees,
+        #               repo_size,
+        #               args.edit_distance_threshold,
+        #               args.kappa_window,
+        #               args.lossy_window_size,
+        #               args.reuse_window_size,
+        #               arf_max_features,
+        #               args.poisson_lambda,
+        #               args.random_state,
+        #               args.bg_kappa_threshold,
+        #               args.cd_kappa_threshold,
+        #               args.reuse_rate_upper_bound,
+        #               args.warning_delta,
+        #               args.drift_delta,
+        #               args.enable_state_adaption,
+        #               args.enable_state_graph)
+        # evaluator = Evaluator()
+        # evaluator.prequential_evaluation(
+        #         classifier=pearl,
+        #         stream=data_file_path,
+        #         max_samples=args.max_samples,
+        #         sample_freq=args.sample_freq,
+        #         metrics_logger=metrics_logger,
+        #         expected_drift_locs=expected_drift_locs,
+        #         acc_per_drift_logger=acc_per_drift_logger)
