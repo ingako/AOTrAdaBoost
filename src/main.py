@@ -47,8 +47,8 @@ if __name__ == '__main__':
                         dest="transfer", action="store_true",
                         help="Enable ProPearl")
     parser.set_defaults(transfer=False)
-    parser.add_argument("--transfer_streams",
-                        dest="transfer_streams", default="", type=str,
+    parser.add_argument("--transfer_streams_paths",
+                        dest="transfer_streams_paths", default="", type=str,
                         help="Data stream paths for transfer learning")
     parser.add_argument("--exp_code",
                         dest="exp_code", default="", type=str,
@@ -187,7 +187,7 @@ if __name__ == '__main__':
     # prepare data
     if args.is_generated_data:
         data_file_dir = f"data/{args.exp_code}/"
-        data_file_path = args.transfer_streams
+        data_file_path = args.transfer_streams_paths
         result_directory = f"{args.exp_code}/"
 
     else:
@@ -211,8 +211,8 @@ if __name__ == '__main__':
 
     print(f"Preparing streams from files {data_file_path}...")
     for file_path in data_file_path.split(";"):
-        if not os.path.isfile(file_path):
-            print(f"Cannot locate file at {file_path}")
+        if not os.path.isfile(f'{file_path}/{args.generator_seed}.arff'):
+            print(f"Cannot locate file at {file_path}/{args.generator_seed}.arff")
             exit()
 
     # prepare transfer sequences
@@ -235,14 +235,17 @@ if __name__ == '__main__':
     # TODO
     acc_per_drift_logger = setup_logger('acc_per_drift', f'{result_directory}/acc-per-drift-{args.generator_seed}.log')
 
-    expected_drift_locs = None
-    if args.is_generated_data:
+    expected_drift_locs_list = []
+    for file_path in data_file_path.split(";"):
+        if not args.is_generated_data:
+            continue
         # for calculating acc per drift
         expected_drift_locs = deque()
-        expected_drift_locs_log = f"{data_file_dir}/drift-{args.generator_seed}.log"
+        expected_drift_locs_log = f"{file_path}/drift-{args.generator_seed}.log"
         with open(f"{expected_drift_locs_log}", 'r') as f:
             for line in f:
                 expected_drift_locs.append(int(line))
+        expected_drift_locs_list.append(expected_drift_locs)
 
 
     if args.transfer:
@@ -271,14 +274,19 @@ if __name__ == '__main__':
                                          args.boost_mode)
 
         # all_predicted_drift_locs, accepted_predicted_drift_locs = \
+
+        data_file_list = []
+        for file_path in data_file_path.split(";"):
+            data_file_list.append(f'{file_path}/{args.generator_seed}.arff')
+
         evaluator = Evaluator()
         evaluator.prequential_evaluation_transfer(
             classifier=classifier,
-            data_file_paths=data_file_path.split(";"),
+            data_file_paths=data_file_list,
             max_samples=args.max_samples,
             sample_freq=args.sample_freq,
             metrics_loggers=metrics_loggers,
-            expected_drift_locs=expected_drift_locs,
+            expected_drift_locs_list=expected_drift_locs_list,
             acc_per_drift_logger=acc_per_drift_logger,
             stream_sequences=stream_sequences)
 

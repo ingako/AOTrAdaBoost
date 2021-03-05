@@ -37,8 +37,7 @@ class Evaluator:
                     max_samples,
                     sample_freq,
                     metrics_loggers,
-                    seq_logger,
-                    expected_drift_locs,
+                    expected_drift_locs_list,
                     acc_per_drift_logger,
                     stream_sequences):
 
@@ -54,8 +53,8 @@ class Evaluator:
         classifier_metrics_list[classifier_idx].start_time = time.process_time()
 
         # for count in range(0, max_samples):
-        for count in range(0, 61000):
-            # TODO
+        for count in range(0, 120000):
+            # TOD0
             if count == switch_location and len(stream_sequences) > 0:
                 # Switch streams to simulate parallel streams
                 metric.total_time += time.process_time() - metric.start_time
@@ -80,22 +79,21 @@ class Evaluator:
             if prediction == actual_label:
                 metric.correct += 1
 
-                if expected_drift_locs:
-                    if count > expected_drift_locs[0] + 1000:
-                        expected_drift_locs.popleft()
-                        acc_per_drift_logger.info(metric.acc_per_drift_correct/1000)
-                        metric.acc_per_drift_correct = 0
-                    if len(expected_drift_locs) > 0 \
-                            and expected_drift_locs[0] < count < expected_drift_locs[0] + 1000:
-                        metric.acc_per_drift_correct += 1
+                # TODO
+                # if expected_drift_locs_list:
+                #     if count > expected_drift_locs_list[classifier_idx][0] + 1000:
+                #         expected_drift_locs_list[classifier_idx].popleft()
+                #         acc_per_drift_logger.info(metric.acc_per_drift_correct/1000)
+                #         metric.acc_per_drift_correct = 0
+                #     if len(expected_drift_locs_list[classifier_idx]) > 0 \
+                #             and expected_drift_locs_list[classifier_idx][0] < count < expected_drift_locs_list[classifier_idx][0] + 1000:
+                #         metric.acc_per_drift_correct += 1
 
             metric.window_actual_labels.append(actual_label)
             metric.window_predicted_labels.append(prediction)
 
             # train
             classifier.train()
-            # if classifier.has_actual_drifted_trees():
-            #     self._transfer(classifier)
 
             # classifier.delete_cur_instance()
             self._log_metrics(classifier_metrics_list[classifier_idx].instance_idx, sample_freq, metric, classifier, metrics_loggers[classifier_idx])
@@ -116,7 +114,7 @@ class Evaluator:
             metrics_logger.info(f"{count},{accuracy},{kappa},"
                                 f"{candidate_tree_size},{transferred_tree_size},{tree_pool_size},{elapsed_time}")
             if transferred_tree_size > 0:
-                print(f"----------------transferred {transferred_tree_size} into foreground")
+                print(f"----------------transferred_tree count: {transferred_tree_size}")
 
             metric.correct = 0
             metric.window_actual_labels = []
