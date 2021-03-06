@@ -179,7 +179,7 @@ void trans_pearl::train() {
                     shared_ptr<trans_pearl_tree> matched_tree =
                             match_concept(bbt_pools[i]->warning_period_instances);
                     if (matched_tree == nullptr) {
-                        bbt_pools[i] == nullptr;
+                        bbt_pools[i] = nullptr;
                     } else {
                         bbt_pools[i]->matched_tree = matched_tree;
                     }
@@ -467,7 +467,8 @@ bool trans_pearl::transfer(int i, Instance* instance) {
         return false;
     }
 
-    bbt_pools[i]->online_tradaboost(instance, true);
+    bbt_pools[i]->online_boost(instance, true);
+
     if (bbt_pools[i]->matched_tree == nullptr) {
         // During drift warning period
         bbt_pools[i]->warning_period_instances.push_back(instance);
@@ -479,7 +480,7 @@ bool trans_pearl::transfer(int i, Instance* instance) {
     for (int j = 0; j < num_diff_distr_instances; j++) {
         Instance* transfer_instance = bbt_pools[i]->get_next_diff_distr_instance();
         if (transfer_instance != nullptr) {
-            bbt_pools[i]->online_tradaboost(transfer_instance, false);
+            bbt_pools[i]->online_boost(transfer_instance, false);
         }
     }
 
@@ -549,12 +550,6 @@ shared_ptr<trans_pearl_tree> trans_pearl::match_concept(vector<Instance*> warnin
         }
     }
 
-    if (matched_tree == nullptr) {
-        // cout << "match_concept: failed to match a tree" << endl;
-        return nullptr;
-    }
-
-    // cout << "match_concept: matched a tree" << endl;
     return matched_tree;
 }
 
@@ -813,7 +808,7 @@ trans_pearl::boosted_bg_tree_pool::boosted_bg_tree_pool(
     }
 }
 
-void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
+void trans_pearl::boosted_bg_tree_pool::online_boost(Instance *instance,
                                                           bool is_same_distribution) {
     if (instance == nullptr) {
         cout << "no_boost(): null instance" << endl;
@@ -823,10 +818,7 @@ void trans_pearl::boosted_bg_tree_pool::online_tradaboost(Instance *instance,
     if (boost_mode != no_boost_mode) {
         boost_count += 1;
         if (boost_count % eviction_interval == 0) {
-            // TODO num of tree eviction param?
-            for (int i = 0; i < 1; i++) {
-                update_bbt();
-            }
+            update_bbt();
         }
 
         std::fill(oob_tree_lam_sum.begin(), oob_tree_lam_sum.end(), 0);

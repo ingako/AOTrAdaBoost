@@ -116,7 +116,7 @@ private:
             // training starts when a mini_batch is ready
             void train(Instance* instance, bool is_same_distribution);
             shared_ptr<pearl_tree> get_best_model(deque<int> actual_labels, int class_count);
-            void online_tradaboost(Instance* instance, bool _is_same_distribution);
+            void online_boost(Instance* instance, bool _is_same_distribution);
             Instance* get_next_diff_distr_instance();
 
             vector<Instance*> warning_period_instances;
