@@ -128,6 +128,22 @@ PYBIND11_MODULE(trans_pearl_wrapper, m) {
                         int,
                         double,
                         string>())
+                .def(py::init<int,
+                        int,
+                        int,
+                        int,
+                        int,
+                        int,
+                        int,
+                        int,
+                        int,
+                        int,
+                        int,
+                        double,
+                        double,
+                        double,
+                        double,
+                        double>())
                 .def("switch_classifier", &trans_pearl_wrapper::switch_classifier)
                 .def("train", &trans_pearl_wrapper::train)
                 .def("predict", &trans_pearl_wrapper::predict)

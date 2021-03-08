@@ -30,8 +30,24 @@ public:
                         double transfer_kappa_threshold,
                         string boost_mode_str);
 
-    void switch_classifier(int classifier_idx);
+    trans_pearl_wrapper(int num_classifiers,
+                        int num_trees,
+                        int max_num_candidate_trees,
+                        int repo_size,
+                        int edit_distance_threshold,
+                        int kappa_window_size,
+                        int lossy_window_size,
+                        int reuse_window_size,
+                        int arf_max_features,
+                        int lambda,
+                        int seed,
+                        double bg_kappa_threshold,
+                        double cd_kappa_threshold,
+                        double reuse_rate_upper_bound,
+                        double warning_delta,
+                        double drift_delta);
 
+    void switch_classifier(int classifier_idx);
     void train();
     int predict();
     int get_cur_instance_label();
@@ -43,8 +59,9 @@ public:
 
 private:
 
-    vector<shared_ptr<trans_pearl>> classifiers;
-    shared_ptr<trans_pearl> current_classifier;
+    vector<shared_ptr<pearl>> classifiers;
+    shared_ptr<pearl> current_classifier;
+
 };
 
 #endif

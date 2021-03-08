@@ -13,19 +13,17 @@ import numpy as np
 from evaluator import Evaluator
 
 import sys
-path = r'../'
+# path = r'../'
+path = r'cmake-build-debug/'
 
 if path not in sys.path:
     sys.path.append(path)
 
-from ctypes import *
+# from ctypes import *
 # libc = cdll.LoadLibrary("cmake-build-debug/trans_pearl_wrapper.cpython-37m-darwin.so")
-libc = cdll.LoadLibrary("cmake-build-debug-remote/trans_pearl_wrapper.cpython-37m-x86_64-linux-gnu.so")
+# libc = cdll.LoadLibrary("cmake-build-debug/trans_pearl_wrapper.cpython-37m-x86_64-linux-gnu.so")
 
-# from build.trans_pearl import adaptive_random_forest, pearl, trans_pearl
-# from trans_pearl import adaptive_random_forest, pearl, trans_pearl
 from trans_pearl_wrapper import adaptive_random_forest, pearl, trans_pearl_wrapper
-# from trans_pearl_wrapper import trans_pearl_wrapper
 
 formatter = logging.Formatter('%(message)s')
 
@@ -52,6 +50,9 @@ if __name__ == '__main__':
                         help="Data stream paths for transfer learning")
     parser.add_argument("--exp_code",
                         dest="exp_code", default="", type=str,
+                        help="Experiment code for result logging path")
+    parser.add_argument("--exp_code_prefix",
+                        dest="exp_code_prefix", default="", type=str,
                         help="Experiment code for result logging path")
     parser.add_argument("--least_transfer_warning_period_instances_length",
                         dest="least_transfer_warning_period_instances_length", default=50, type=int,
@@ -121,7 +122,7 @@ if __name__ == '__main__':
                         dest="max_samples", default=200000, type=int,
                         help="total number of samples")
     parser.add_argument("--sample_freq",
-                        dest="sample_freq", default=1000, type=int,
+                        dest="sample_freq", default=500, type=int,
                         help="log interval for performance")
     parser.add_argument("--kappa_window",
                         dest="kappa_window", default=50, type=int,
@@ -186,7 +187,7 @@ if __name__ == '__main__':
 
     # prepare data
     if args.is_generated_data:
-        data_file_dir = f"data/{args.exp_code}/"
+        data_file_dir = f"data/{args.exp_code_prefix}/"
         data_file_path = args.transfer_streams_paths
         result_directory = f"{args.exp_code}/"
 
@@ -275,21 +276,6 @@ if __name__ == '__main__':
 
         # all_predicted_drift_locs, accepted_predicted_drift_locs = \
 
-        data_file_list = []
-        for file_path in data_file_path.split(";"):
-            data_file_list.append(f'{file_path}/{args.generator_seed}.arff')
-
-        evaluator = Evaluator()
-        evaluator.prequential_evaluation_transfer(
-            classifier=classifier,
-            data_file_paths=data_file_list,
-            max_samples=args.max_samples,
-            sample_freq=args.sample_freq,
-            metrics_loggers=metrics_loggers,
-            expected_drift_locs_list=expected_drift_locs_list,
-            acc_per_drift_logger=acc_per_drift_logger,
-            stream_sequences=stream_sequences)
-
         # accepted_predicted_drifts_log_file = \
         #     f"{result_directory}/accepted-predicted-drifts-{args.generator_seed}.log"
         # all_predicted_drifts_log_file = \
@@ -307,29 +293,35 @@ if __name__ == '__main__':
     else:
         # TODO
         print("main.py: init pearl")
-        # pearl = pearl(args.num_trees,
-        #               args.max_num_candidate_trees,
-        #               repo_size,
-        #               args.edit_distance_threshold,
-        #               args.kappa_window,
-        #               args.lossy_window_size,
-        #               args.reuse_window_size,
-        #               arf_max_features,
-        #               args.poisson_lambda,
-        #               args.random_state,
-        #               args.bg_kappa_threshold,
-        #               args.cd_kappa_threshold,
-        #               args.reuse_rate_upper_bound,
-        #               args.warning_delta,
-        #               args.drift_delta,
-        #               args.enable_state_adaption,
-        #               args.enable_state_graph)
-        # evaluator = Evaluator()
-        # evaluator.prequential_evaluation(
-        #         classifier=pearl,
-        #         stream=data_file_path,
-        #         max_samples=args.max_samples,
-        #         sample_freq=args.sample_freq,
-        #         metrics_logger=metrics_logger,
-        #         expected_drift_locs=expected_drift_locs,
-        #         acc_per_drift_logger=acc_per_drift_logger)
+        classifier = trans_pearl_wrapper(len(data_file_path.split(";")),
+                      args.num_trees,
+                      args.max_num_candidate_trees,
+                      repo_size,
+                      args.edit_distance_threshold,
+                      args.kappa_window,
+                      args.lossy_window_size,
+                      args.reuse_window_size,
+                      arf_max_features,
+                      args.poisson_lambda,
+                      args.random_state,
+                      args.bg_kappa_threshold,
+                      args.cd_kappa_threshold,
+                      args.reuse_rate_upper_bound,
+                      args.warning_delta,
+                      args.drift_delta)
+
+    data_file_list = []
+    for file_path in data_file_path.split(";"):
+        data_file_list.append(f'{file_path}/{args.generator_seed}.arff')
+
+    evaluator = Evaluator()
+    evaluator.prequential_evaluation_transfer(
+        classifier=classifier,
+        data_file_paths=data_file_list,
+        max_samples=args.max_samples,
+        sample_freq=args.sample_freq,
+        metrics_loggers=metrics_loggers,
+        expected_drift_locs_list=expected_drift_locs_list,
+        acc_per_drift_logger=acc_per_drift_logger,
+        stream_sequences=stream_sequences)
+
