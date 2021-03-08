@@ -85,6 +85,11 @@ shared_ptr<pearl_tree> trans_pearl::make_pearl_tree(int tree_pool_id) {
 // find drifted trees, update potential_drifted_tree_indices
 // candidate trees make predictions for performance evaluation
 void trans_pearl::train() {
+    if (instance == nullptr) {
+        cout << "train(): null instance" << endl;
+        exit(1);
+    }
+
     stream_instance_idx += 1;
 
     if (drift_warning_period_lengths.size() == 0) {
@@ -117,6 +122,8 @@ void trans_pearl::train() {
             drift_warning_period_lengths[i]++;
         }
 
+        cur_tree = static_pointer_cast<trans_pearl_tree>(foreground_trees[i]);
+        cur_tree->store_instance(instance);
         transfer(i, instance);
 
         // online bagging
@@ -128,14 +135,7 @@ void trans_pearl::train() {
         }
 
         instance->setWeight(weight);
-
-        cur_tree = static_pointer_cast<trans_pearl_tree>(foreground_trees[i]);
         cur_tree->train(*instance);
-        cur_tree->store_instance(instance);
-        if (instance == nullptr) {
-            cout << "train(): null instance" << endl;
-            exit(1);
-        }
 
         // if (cur_tree->instance_store.size() > 2000) {
         //     for (int idx = 0; idx < num_trees; idx++) {
@@ -521,6 +521,7 @@ bool trans_pearl::transfer(int i, Instance* instance) {
 shared_ptr<trans_pearl_tree> trans_pearl::match_concept(vector<Instance*> warning_period_instances) {
     shared_ptr<trans_pearl_tree> matched_tree = nullptr;
     double highest_kappa = 0.0;
+    int matched_tree_idx = -1;
 
     // For kappa calculation
     int class_count = warning_period_instances[0]->getNumberClasses();
@@ -530,7 +531,9 @@ shared_ptr<trans_pearl_tree> trans_pearl::match_concept(vector<Instance*> warnin
     }
 
     for (auto registered_tree_pool : registered_tree_pools) {
-        for (auto tree : *registered_tree_pool) {
+        // for (auto tree : *registered_tree_pool) {
+        for (int i = 0; i < registered_tree_pool->size(); i++) {
+            auto tree = (*registered_tree_pool)[i];
             shared_ptr<trans_pearl_tree> trans_tree = static_pointer_cast<trans_pearl_tree>(tree);
 
             vector<int> predicted_labels;
@@ -546,9 +549,14 @@ shared_ptr<trans_pearl_tree> trans_pearl::match_concept(vector<Instance*> warnin
             if (highest_kappa < trans_tree->kappa) {
                 highest_kappa = trans_tree->kappa;
                 matched_tree = trans_tree;
+                matched_tree_idx = i;
             }
         }
     }
+
+    cout << "------------------------------matched_tree_idx: " << matched_tree_idx
+         << "| kappa: " << highest_kappa
+         << "| size: " << instance_store_size << endl;
 
     return matched_tree;
 }
@@ -643,18 +651,19 @@ void trans_pearl_tree::store_instance(Instance* instance) {
         exit(1);
     }
 
-    this->instance_store.push_back(instance); // for generate_data
+    if (this->instance_store.size() < this->instance_store_size) {
+        this->instance_store.push_back(instance);
+        // this->instance_store.pop_front();
+    }
+
     if (this->bg_pearl_tree != nullptr) {
         shared_ptr<trans_pearl_tree> trans_bg_tree;
         trans_bg_tree = static_pointer_cast<trans_pearl_tree>(this->bg_pearl_tree);
-        trans_bg_tree->instance_store.push_back(instance);
-        if (trans_bg_tree->instance_store.size() > this->instance_store_size) {
-            trans_bg_tree->instance_store.pop_front();
-        }
-    }
 
-    if (this->instance_store.size() > this->instance_store_size) {
-        this->instance_store.pop_front();
+        if (trans_bg_tree->instance_store.size() < this->instance_store_size) {
+            trans_bg_tree->instance_store.push_back(instance);
+            // trans_bg_tree->instance_store.pop_front();
+        }
     }
 }
 
@@ -877,9 +886,9 @@ shared_ptr<pearl_tree> trans_pearl::boosted_bg_tree_pool::get_best_model(deque<i
         }
     }
 
-    if (highest_kappa >= transfer_kappa_threshold) {
-        cout << "------------------------------pool_pos_idx: " << pool_pos_idx << endl;
-    }
+    // if (highest_kappa >= transfer_kappa_threshold) {
+    //     cout << "------------------------------pool_pos_idx: " << pool_pos_idx << endl;
+    // }
 
     return best_model;
 }
