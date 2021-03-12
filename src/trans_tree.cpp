@@ -33,13 +33,57 @@ trans_tree::trans_tree(
 
 }
 
+double compute_kappa(deque<int> predicted_labels, deque<int> actual_labels, int class_count) {
+    // prepare confusion matrix
+    vector<vector<int>> confusion_matrix(class_count, vector<int>(class_count, 0));
+    int correct = 0;
+
+    for (int i = 0; i < predicted_labels.size(); i++) {
+        confusion_matrix[actual_labels[i]][predicted_labels[i]]++;
+        if (actual_labels[i] == predicted_labels[i]) {
+            correct++;
+        }
+    }
+
+    double accuracy = (double) correct / predicted_labels.size();
+
+    // computes the Cohen's kappa coefficient
+    int sample_count = predicted_labels.size();
+    double p0 = accuracy;
+    double pc = 0.0;
+    int row_count = class_count;
+    int col_count = class_count;
+
+
+    for (int i = 0; i < row_count; i++) {
+        double row_sum = 0;
+        for (int j = 0; j < col_count; j++) {
+            row_sum += confusion_matrix[i][j];
+        }
+
+        double col_sum = 0;
+        for (int j = 0; j < row_count; j++) {
+            col_sum += confusion_matrix[j][i];
+        }
+
+        pc += (row_sum / sample_count) * (col_sum / sample_count);
+    }
+
+    if (pc == 1) {
+        return 1;
+    }
+
+    return (p0 - pc) / (1.0 - pc);
+}
+
+
 void trans_tree::init() {
     foreground_tree = make_tree(0);
     tree_pool.push_back(foreground_tree);
 }
 
 shared_ptr<hoeffding_tree> trans_tree::make_tree(int tree_pool_id) {
-    return make_shared<hoeffding_tree>(warning_delta, drift_delta);
+    return make_shared<hoeffding_tree>(warning_delta, drift_delta, instance_store_size);
 }
 
 void trans_tree::train() {
@@ -53,8 +97,8 @@ void trans_tree::train() {
     }
     actual_labels.push_back(actual_label);
 
-    // foreground_tree->store_instance(instance);
-    // transfer(instance);
+    foreground_tree->store_instance(instance);
+    transfer(instance);
 
     foreground_tree->train(*instance);
 
@@ -112,12 +156,128 @@ void trans_tree::train() {
     }
 }
 
+bool trans_tree::transfer(Instance* instance) {
+    if (bbt_pool == nullptr) {
+        return false;
+    }
+
+    bool registered_tree_pools_have_concepts = false;
+    for (auto registered_tree_pool : registered_tree_pools) {
+        if (registered_tree_pool->size() != 0) {
+            registered_tree_pools_have_concepts = true;
+            break;
+        }
+    }
+    if (!registered_tree_pools_have_concepts) {
+        return false;
+    }
+
+    bbt_pool->online_boost(instance, true);
+
+    if (bbt_pool->matched_tree == nullptr) {
+        // During drift warning period
+        bbt_pool->warning_period_instances.push_back(instance);
+
+        return false;
+    }
+
+    // After actual drift point, perform boosting with weight decrement
+    for (int j = 0; j < num_diff_distr_instances; j++) {
+        Instance* transfer_instance = bbt_pool->get_next_diff_distr_instance();
+        if (transfer_instance != nullptr) {
+            bbt_pool->online_boost(transfer_instance, false);
+        }
+    }
+
+    // Attempt transfer
+    shared_ptr<hoeffding_tree> transfer_candidate = bbt_pool->get_best_model(actual_labels,
+                                                                             instance->getNumberClasses());
+    if (transfer_candidate == nullptr) {
+        return false;
+    }
+
+    foreground_tree->kappa = compute_kappa(foreground_tree->predicted_labels, actual_labels, instance->getNumberClasses());
+
+    if (transfer_candidate->kappa - foreground_tree->kappa >= transfer_kappa_threshold
+        && transfer_candidate->kappa >= transfer_kappa_threshold) {
+
+        // Update PEARL related data structs
+        transfer_candidate->tree_pool_id = tree_pool.size();
+        tree_pool.push_back(transfer_candidate);
+
+        foreground_tree = transfer_candidate;
+        transferred_tree_total_count += 1;
+        bbt_pool = nullptr; // TODO reduce overhead
+        cout << "transferred tree kappa: " << transfer_candidate->kappa
+             << " | "
+             << "foreground tree kappa: " << foreground_tree->kappa << endl;
+    }
+
+    return true;
+}
+
+shared_ptr<hoeffding_tree> trans_tree::match_concept(vector<Instance*> warning_period_instances) {
+    shared_ptr<hoeffding_tree> matched_tree = nullptr;
+    double highest_kappa = 0.0;
+    int matched_tree_idx = -1;
+
+    // For kappa calculation
+    int class_count = warning_period_instances[0]->getNumberClasses();
+    deque<int> true_labels;
+    for (auto warning_period_instance : warning_period_instances) {
+        true_labels.push_back(warning_period_instance->getLabel());
+    }
+
+    for (auto registered_tree_pool : registered_tree_pools) {
+        for (int i = 0; i < registered_tree_pool->size(); i++) {
+            auto tree = (*registered_tree_pool)[i];
+            shared_ptr<hoeffding_tree> trans_tree = static_pointer_cast<hoeffding_tree>(tree);
+
+            deque<int> predicted_labels;
+            for (auto warning_period_instance : warning_period_instances) {
+                int prediction = trans_tree->predict(*warning_period_instance, false);
+                predicted_labels.push_back(prediction);
+            }
+
+            trans_tree->kappa = compute_kappa(predicted_labels, true_labels, class_count);
+            // cout << "match_concept trans_tree kappa: " << trans_tree->kappa << endl;
+            if (highest_kappa < trans_tree->kappa) {
+                highest_kappa = trans_tree->kappa;
+                matched_tree = trans_tree;
+                matched_tree_idx = i;
+            }
+        }
+    }
+
+    cout << "------------------------------matched_tree_idx: " << matched_tree_idx
+         << "| kappa: " << highest_kappa
+         << "| size: " << instance_store_size << endl;
+
+    return matched_tree;
+}
+
+void trans_tree::register_tree_pool(vector<shared_ptr<hoeffding_tree>>& _tree_pool) {
+    this->registered_tree_pools.push_back(&_tree_pool);
+}
+
+vector<shared_ptr<hoeffding_tree>>& trans_tree::get_concept_repo() {
+    return this->tree_pool;
+}
+
 int trans_tree::predict() {
     if (foreground_tree == nullptr) {
         init();
     }
 
-    return foreground_tree->predict(*instance);
+    return foreground_tree->predict(*instance, true);
+}
+
+int trans_tree::get_transferred_tree_group_size() {
+    return transferred_tree_total_count;
+}
+
+int trans_tree::get_tree_pool_size() {
+    return tree_pool.size();
 }
 
 bool trans_tree::detect_change(int error_count, unique_ptr<HT::ADWIN>& detector) {
@@ -168,9 +328,12 @@ void trans_tree::delete_cur_instance() {
 
 
 // class tree
-hoeffding_tree::hoeffding_tree(double warning_delta, double drift_delta) :
+hoeffding_tree::hoeffding_tree(double warning_delta,
+                               double drift_delta,
+                               int instance_store_size) :
         warning_delta(warning_delta),
-        drift_delta(drift_delta) {
+        drift_delta(drift_delta),
+        instance_store_size(instance_store_size) {
 
     tree = make_unique<HT::HoeffdingTree>();
     warning_detector = make_unique<HT::ADWIN>(warning_delta);
@@ -178,7 +341,14 @@ hoeffding_tree::hoeffding_tree(double warning_delta, double drift_delta) :
     bg_tree = nullptr;
 }
 
-int hoeffding_tree::predict(Instance& instance) {
+hoeffding_tree::hoeffding_tree(hoeffding_tree const &rhs) :
+            warning_delta(rhs.warning_delta),
+            drift_delta(rhs.drift_delta),
+            instance_store_size(rhs.instance_store_size) {
+
+}
+
+int hoeffding_tree::predict(Instance& instance, bool track_prediction) {
     double* classPredictions = tree->getPrediction(instance);
     int result = 0;
     double max_val = classPredictions[0];
@@ -191,6 +361,11 @@ int hoeffding_tree::predict(Instance& instance) {
         }
     }
 
+    if (predicted_labels.size() >= kappa_window_size) {
+        predicted_labels.pop_front();
+    }
+    predicted_labels.push_back(result);
+
     return result;
 }
 
@@ -200,4 +375,340 @@ void hoeffding_tree::train(Instance& instance) {
     if (bg_tree != nullptr) {
         bg_tree->train(instance);
     }
+}
+
+void hoeffding_tree::store_instance(Instance* instance) {
+    if (instance == nullptr) {
+        cout << "nullptr instance added! " << endl;
+        exit(1);
+    }
+
+    if (this->instance_store.size() < this->instance_store_size) {
+        this->instance_store.push_back(instance);
+        // this->instance_store.pop_front();
+    }
+
+    if (this->bg_tree != nullptr) {
+        if (bg_tree->instance_store.size() < this->instance_store_size) {
+            bg_tree->instance_store.push_back(instance);
+            // trans_bg_tree->instance_store.pop_front();
+        }
+    }
+}
+
+// class boosted_bg_tree_pool
+trans_tree::boosted_bg_tree_pool::boosted_bg_tree_pool(
+        enum boost_modes_enum boost_mode,
+        int pool_size,
+        int eviction_interval,
+        double transfer_kappa_threshold,
+        shared_ptr<hoeffding_tree> tree_template,
+        int lambda):
+        boost_mode(boost_mode),
+        eviction_interval(eviction_interval),
+        transfer_kappa_threshold(transfer_kappa_threshold),
+        pool_size(pool_size),
+        tree_template(tree_template),
+        lambda(lambda) {
+
+    mrand = std::mt19937(42);
+    oob_tree_lam_sum.resize(pool_size, 0);
+    oob_tree_correct_lam_sum.resize(pool_size, 0);
+    oob_tree_wrong_lam_sum.resize(pool_size, 0);
+
+    // init BBT
+    if (boost_mode == boost_modes_enum::no_boost_mode) {
+        update_bbt();
+    } else {
+        for (int i = 0; i < pool_size; i++) {
+            update_bbt();
+        }
+    }
+}
+
+void trans_tree::boosted_bg_tree_pool::online_boost(Instance *instance,
+                                                     bool is_same_distribution) {
+    if (instance == nullptr) {
+        cout << "no_boost(): null instance" << endl;
+        exit(1);
+    }
+
+    if (boost_mode != boost_modes_enum::no_boost_mode) {
+        boost_count += 1;
+        if (boost_count % eviction_interval == 0) {
+            update_bbt();
+        }
+
+        std::fill(oob_tree_lam_sum.begin(), oob_tree_lam_sum.end(), 0);
+        std::fill(oob_tree_correct_lam_sum.begin(), oob_tree_correct_lam_sum.end(), 0);
+        std::fill(oob_tree_wrong_lam_sum.begin(), oob_tree_wrong_lam_sum.end(), 0);
+    }
+
+    switch(boost_mode) {
+        case boost_modes_enum::no_boost_mode:
+            this->no_boost(instance);
+            break;
+        case boost_modes_enum::ozaboost_mode:
+            this->ozaboost(instance);
+            break;
+        case boost_modes_enum::tradaboost_mode:
+            this->tradaboost(instance, is_same_distribution);
+            break;
+        case boost_modes_enum::otradaboost_mode:
+            this->otradaboost(instance, is_same_distribution);
+            break;
+        default:
+            cout << "Incorrect boost_mode" << endl;
+            exit(1);
+    }
+
+    if (is_same_distribution) {
+        this->perf_eval(instance);
+    }
+}
+
+Instance* trans_tree::boosted_bg_tree_pool::get_next_diff_distr_instance() {
+    if (instance_store_idx >= matched_tree->instance_store.size()) {
+        return nullptr;
+    }
+    return matched_tree->instance_store[instance_store_idx++];
+}
+
+void trans_tree::boosted_bg_tree_pool::perf_eval(Instance* instance) {
+    for (auto tree : pool) {
+        tree->predict(*instance, true);
+    }
+}
+
+shared_ptr<hoeffding_tree> trans_tree::boosted_bg_tree_pool::get_best_model(deque<int> actual_labels,
+                                                                         int class_count) {
+    shared_ptr<hoeffding_tree> best_model = nullptr;
+    double highest_kappa = 0;
+    int pool_pos_idx = -1;
+    for (int i = 0; i < pool.size(); i++) {
+        auto tree = pool[i];
+        tree->kappa = compute_kappa(tree->predicted_labels, actual_labels, class_count);
+        if (highest_kappa < tree->kappa) {
+            highest_kappa = tree->kappa;
+            best_model = tree;
+            pool_pos_idx = i;
+        }
+    }
+
+    // if (highest_kappa >= transfer_kappa_threshold) {
+    //     cout << "------------------------------pool_pos_idx: " << pool_pos_idx << endl;
+    // }
+
+    return best_model;
+}
+
+void trans_tree::boosted_bg_tree_pool::update_bbt() {
+    bbt_counter++;
+
+    // create a new boosting tree for current mini-batch
+    shared_ptr<hoeffding_tree> new_tree = std::make_shared<hoeffding_tree>(*tree_template);
+    if (pool.size() < pool_size) {
+        pool.push_back(new_tree);
+    } else {
+        pool[bbt_counter % pool_size] = new_tree;
+    }
+}
+
+void trans_tree::boosted_bg_tree_pool::no_boost(Instance* instance) {
+    // Only one tree exists in no_boost_mode
+    auto tree = pool[0];
+
+    // bagging
+    std::poisson_distribution<int> poisson_distr(lambda);
+    double k = poisson_distr(mrand);
+
+    double weight = instance->getWeight();
+    if (k > 0 && weight > 0) {
+        instance->setWeight(k * weight);
+
+        tree->train(*instance);
+        instance->setWeight(weight);
+    }
+}
+
+void trans_tree::boosted_bg_tree_pool::ozaboost(Instance* instance) {
+    double lambda_d = 1;
+    instance->setWeight(1);
+
+    for (int i = 0; i < pool.size(); i++) {
+        auto tree = pool[i];
+
+        // bagging
+        std::poisson_distribution<int> poisson_distr(lambda_d);
+        double k = poisson_distr(mrand);
+
+        double weight = instance->getWeight();
+        if (k > 0 && weight > 0) {
+            instance->setWeight(k * weight);
+
+            tree->train(*instance);
+            instance->setWeight(weight);
+        }
+
+        oob_tree_lam_sum[i] += lambda_d;
+        bool correctly_classified;
+        if (tree->predict(*instance, false) == instance->getLabel()) {
+            oob_tree_correct_lam_sum[i] += lambda_d;
+            correctly_classified = true;
+        } else {
+            oob_tree_wrong_lam_sum[i] += lambda_d;
+            correctly_classified = false;
+        }
+
+        if (correctly_classified) {
+            if (oob_tree_correct_lam_sum[i] >= epsilon) {
+                lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+            }
+        } else {
+            if (oob_tree_wrong_lam_sum[i] >= epsilon) {
+                lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+            }
+        }
+    }
+}
+
+void trans_tree::boosted_bg_tree_pool::tradaboost(Instance* instance, bool is_same_distribution) {
+    double lambda_d = 1;
+    instance->setWeight(1);
+
+    for (int i = 0; i < pool.size(); i++) {
+        auto tree = pool[i];
+
+        // bagging
+        std::poisson_distribution<int> poisson_distr(lambda_d);
+        double k = poisson_distr(mrand);
+
+        double weight = instance->getWeight();
+        if (k > 0 && weight > 0) {
+            instance->setWeight(k * weight);
+
+            tree->train(*instance);
+            instance->setWeight(weight);
+        }
+
+        oob_tree_lam_sum[i] += lambda_d;
+        bool correctly_classified;
+        if (tree->predict(*instance, false) == instance->getLabel()) {
+            oob_tree_correct_lam_sum[i] += lambda_d;
+            correctly_classified = true;
+        } else {
+            oob_tree_wrong_lam_sum[i] += lambda_d;
+            correctly_classified = false;
+        }
+
+        if (is_same_distribution) {
+            if (correctly_classified) {
+                if (oob_tree_correct_lam_sum[i] >= epsilon) {
+                    lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                }
+            } else {
+                if (oob_tree_wrong_lam_sum[i] >= epsilon) {
+                    lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                }
+            }
+        } else {
+            if (correctly_classified) {
+                if (oob_tree_wrong_lam_sum[i] >= epsilon) {
+                    lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                }
+            } else {
+                if (oob_tree_correct_lam_sum[i] >= epsilon) {
+                    lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                }
+            }
+        }
+    }
+}
+
+
+void trans_tree::boosted_bg_tree_pool::otradaboost(Instance* instance, bool is_same_distribution) {
+    double lambda_d = 1;
+    instance->setWeight(1);
+
+    // cout << "lamb: " ;
+    for (int i = 0; i < pool.size(); i++) {
+        auto tree = pool[i];
+
+        // bagging
+        std::poisson_distribution<int> poisson_distr(lambda_d);
+        double k = poisson_distr(mrand);
+
+        double weight = instance->getWeight();
+        if (k > 0 && weight > 0) {
+            instance->setWeight(k * weight);
+
+            tree->train(*instance);
+            instance->setWeight(weight);
+        }
+
+        // boosting based on out-of-bag errors
+        if (k == 0) {
+            oob_tree_lam_sum[i] += lambda_d;
+            bool correctly_classified;
+            if (tree->predict(*instance, false) == instance->getLabel()) {
+                oob_tree_correct_lam_sum[i] += lambda_d;
+                correctly_classified = true;
+            } else {
+                oob_tree_wrong_lam_sum[i] += lambda_d;
+                correctly_classified = false;
+            }
+
+            // cout << "lambda_d: " << lambda_d << endl;
+            if (is_same_distribution) {
+                if (correctly_classified) {
+                    if (oob_tree_correct_lam_sum[i] >= epsilon) {
+                        lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                    }
+                } else {
+                    if (oob_tree_wrong_lam_sum[i] >= epsilon) {
+                        lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                    }
+                }
+            } else {
+                if (correctly_classified) {
+                    if (oob_tree_wrong_lam_sum[i] >= epsilon) {
+                        lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                    }
+                } else {
+                    if (oob_tree_correct_lam_sum[i] >= epsilon) {
+                        lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                    }
+                }
+            }
+
+            // if (lambda_d == std::numeric_limits<float>::infinity()) {
+            //     cout << "inf" << endl;
+            //     cout << "oob_tree_correct_lam_sum: " <<  oob_tree_correct_lam_sum[i] << endl;
+            //     cout << "oob_tree_wrong_lam_sum: " <<  oob_tree_wrong_lam_sum[i] << endl;
+            //     exit(1);
+            // }
+        }
+
+        // cout << lambda_d << " ";
+
+        // if (lambda_d > 60835322454746) {
+        //     cout << endl;
+        //     cout << "correct: " << oob_tree_correct_lam_sum[i] << endl;
+        //     cout << "wrong: " << oob_tree_wrong_lam_sum[i] << endl;
+        //     cout << "total: " << oob_tree_lam_sum[i] << endl;
+        //     exit(1);
+        // }
+    }
+    // cout << endl;
+
+    // cout << "oobc: ";
+    // for (auto l : oob_tree_correct_lam_sum) {
+    //     cout << l << " ";
+    // }
+    // cout << endl << "oobw: ";
+    // for (auto l : oob_tree_wrong_lam_sum) {
+    //     cout << l << " ";
+    // }
+    // cout << endl;
+
 }

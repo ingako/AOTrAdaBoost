@@ -4,26 +4,11 @@
 #include <streamDM/streams/ArffReader.h>
 #include <streamDM/learners/Classifiers/Trees/HoeffdingTree.h>
 #include <streamDM/learners/Classifiers/Trees/ADWIN.h>
-#include "trans_tree_wrapper.h"
 
-enum boost_modes { no_boost_mode, ozaboost_mode, tradaboost_mode, otradaboost_mode };
+enum class boost_modes_enum { no_boost_mode, ozaboost_mode, tradaboost_mode, otradaboost_mode };
+double compute_kappa(deque<int> predicted_labels, deque<int> actual_labels, int class_count);
 
-class hoeffding_tree {
-public:
-    hoeffding_tree(double warning_delta, double drift_delta);
-    void train(Instance& instance);
-    int predict(Instance& instance);
-    unique_ptr<HT::HoeffdingTree> tree;
-    shared_ptr<hoeffding_tree> bg_tree;
-    unique_ptr<HT::ADWIN> warning_detector;
-    unique_ptr<HT::ADWIN> drift_detector;
-
-private:
-    double warning_delta;
-    double drift_delta;
-};
-
-
+class hoeffding_tree;
 class trans_tree {
     class boosted_bg_tree_pool;
 
@@ -48,6 +33,9 @@ public:
     shared_ptr<hoeffding_tree> make_tree(int tree_pool_id);
     bool detect_change(int error_count, unique_ptr<HT::ADWIN>& detector);
 
+    int get_transferred_tree_group_size();
+    int get_tree_pool_size();
+
     bool init_data_source(const string& filename);
     bool get_next_instance();
     int get_cur_instance_label();
@@ -56,8 +44,12 @@ public:
     // transfer
     vector<shared_ptr<hoeffding_tree>>& get_concept_repo();
     void register_tree_pool(vector<shared_ptr<hoeffding_tree>>& pool);
+    bool transfer(Instance* instance);
     shared_ptr<hoeffding_tree> match_concept(vector<Instance*> warning_period_instances);
     int get_transferred_tree_group_size() const;
+    int transferred_tree_total_count = 0;
+    // double compute_kappa(vector<int> predicted_labels, vector<int> actual_labels, int class_count);
+    vector<vector<shared_ptr<hoeffding_tree>>*> registered_tree_pools;
 
 private:
 
@@ -73,14 +65,14 @@ private:
     unique_ptr<Reader> reader;
 
     // transfer
-    std::map<string, boost_modes> boost_mode_map =
+    std::map<string, boost_modes_enum> boost_mode_map =
             {
-                    { "no_boost", no_boost_mode},
-                    { "ozaboost", ozaboost_mode },
-                    { "tradaboost", tradaboost_mode },
-                    { "otradaboost", otradaboost_mode },
+                    { "no_boost", boost_modes_enum::no_boost_mode},
+                    { "ozaboost", boost_modes_enum::ozaboost_mode },
+                    { "tradaboost", boost_modes_enum::tradaboost_mode },
+                    { "otradaboost", boost_modes_enum::otradaboost_mode },
             };
-    boost_modes boost_mode = otradaboost_mode;
+    boost_modes_enum boost_mode = boost_modes_enum::otradaboost_mode;
     int least_transfer_warning_period_length = 50;
     int instance_store_size = 500;
     int num_diff_distr_instances = 30;
@@ -91,9 +83,9 @@ private:
 
     class boosted_bg_tree_pool {
     public:
-        boost_modes boost_mode = otradaboost_mode;
+        boost_modes_enum boost_mode = boost_modes_enum::otradaboost_mode;
 
-        boosted_bg_tree_pool(enum boost_modes boost_mode,
+        boosted_bg_tree_pool(enum boost_modes_enum boost_mode,
                              int pool_size,
                              int eviction_interval,
                              double transfer_kappa_threshold,
@@ -134,8 +126,35 @@ private:
         void otradaboost(Instance* instance, bool is_same_distribution);
         void perf_eval(Instance* instance);
     };
+};
 
+class hoeffding_tree {
+public:
+    hoeffding_tree(double warning_delta, double drift_delta, int instance_store_size);
+    hoeffding_tree(hoeffding_tree const &rhs);
+
+    void train(Instance& instance);
+    int predict(Instance& instance, bool track_prediction);
+    void store_instance(Instance* instance);
+
+    unique_ptr<HT::HoeffdingTree> tree;
+    shared_ptr<hoeffding_tree> bg_tree;
+    unique_ptr<HT::ADWIN> warning_detector;
+    unique_ptr<HT::ADWIN> drift_detector;
+    int tree_pool_id = -1;
+    double kappa = numeric_limits<double>::min();
+    deque<int> predicted_labels;
+    int kappa_window_size = 60;
+
+    deque<Instance*> instance_store;
+    int instance_store_size;
+
+private:
+    double warning_delta;
+    double drift_delta;
 
 };
+
+
 
 #endif //TRANS_TREE_H

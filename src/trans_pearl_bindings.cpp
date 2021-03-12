@@ -4,6 +4,7 @@
 #include <PEARL/src/cpp/pearl.h>
 #include "trans_pearl.h"
 #include "trans_pearl_wrapper.h"
+#include "trans_tree_wrapper.h"
 
 // PYBIND11_MAKE_OPAQUE(vector<Instance*>);
 // PYBIND11_MAKE_OPAQUE(vector<shared_ptr<pearl_tree>>);
@@ -153,5 +154,36 @@ PYBIND11_MODULE(trans_pearl_wrapper, m) {
                 .def("get_candidate_tree_group_size", &trans_pearl_wrapper::get_candidate_tree_group_size)
                 .def("get_transferred_tree_group_size", &trans_pearl_wrapper::get_transferred_tree_group_size)
                 .def("get_tree_pool_size", &trans_pearl_wrapper::get_tree_pool_size);
+
+
+
+    py::class_<trans_tree_wrapper>(m, "trans_tree_wrapper")
+            .def(py::init<
+                    int,
+                    int,
+                    int,
+                    double,
+                    double,
+                    // transfer learning params
+                    int,
+                    int,
+                    int,
+                    int,
+                    int,
+                    double,
+                    string>())
+            .def("init_data_source", &trans_tree_wrapper::init_data_source)
+            .def("get_next_instance", &trans_tree_wrapper::get_next_instance)
+            .def("get_cur_instance_label", &trans_tree_wrapper::get_cur_instance_label)
+            .def("predict", &trans_tree_wrapper::predict)
+            .def("train", &trans_tree_wrapper::train)
+            .def("switch_classifier", &trans_tree_wrapper::switch_classifier)
+            .def("train", &trans_tree_wrapper::train)
+            .def("predict", &trans_tree_wrapper::predict)
+            .def("get_cur_instance_label", &trans_tree_wrapper::get_cur_instance_label)
+            .def("init_data_source", &trans_tree_wrapper::init_data_source)
+            .def("get_next_instance", &trans_tree_wrapper::get_next_instance)
+            .def("get_transferred_tree_group_size", &trans_tree_wrapper::get_transferred_tree_group_size)
+            .def("get_tree_pool_size", &trans_tree_wrapper::get_tree_pool_size);
 
 }
