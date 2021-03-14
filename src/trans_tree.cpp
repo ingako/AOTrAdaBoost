@@ -26,8 +26,13 @@ trans_tree::trans_tree(
     mrand = std::mt19937(seed);
 
     if (boost_mode_map.find(boost_mode_str) == boost_mode_map.end() ) {
-        cout << "Invalid boost mode" << endl;
-        exit(1);
+        if (boost_mode_str == "disable_transfer") {
+            this->enable_transfer = false;
+        } else {
+            cout << "Invalid boost mode" << endl;
+            exit(1);
+
+        }
     }
     this->boost_mode = boost_mode_map[boost_mode_str];
 
@@ -97,8 +102,10 @@ void trans_tree::train() {
     }
     actual_labels.push_back(actual_label);
 
-    foreground_tree->store_instance(instance);
-    transfer(instance);
+    if (enable_transfer) {
+        foreground_tree->store_instance(instance);
+        transfer(instance);
+    }
 
     foreground_tree->train(*instance);
 
@@ -114,31 +121,13 @@ void trans_tree::train() {
         foreground_tree->warning_detector->resetChange();
         foreground_tree->drift_detector->resetChange();
 
-        if (bbt_pool != nullptr) {
-            // TODO allow concept match after actual drift?
-            if (bbt_pool->warning_period_instances.size() < least_transfer_warning_period_length) {
-                // cout << "-------------------------------------warning_period_instances size is not enough: "
-                //      << i << ":"
-                //      << bbt_pools[i]->warning_period_instances.size() << endl;
-                bbt_pool = nullptr;
-            } else {
-                shared_ptr<hoeffding_tree> matched_tree =
-                        match_concept(bbt_pool->warning_period_instances);
-                if (matched_tree == nullptr) {
-                    bbt_pool = nullptr;
-                } else {
-                    bbt_pool->matched_tree = matched_tree;
-                }
-            }
-        }
-
+        foreground_tree->tree_pool_id = tree_pool.size();
+        tree_pool.push_back(foreground_tree);
         if (foreground_tree->bg_tree == nullptr) {
             foreground_tree = make_tree(-1);
         } else {
             foreground_tree = foreground_tree->bg_tree;
         }
-        foreground_tree->tree_pool_id = tree_pool.size();
-        tree_pool.push_back(foreground_tree);
 
     }
 
@@ -147,7 +136,7 @@ void trans_tree::train() {
         foreground_tree->bg_tree = make_tree(-1);
         foreground_tree->warning_detector->resetChange();
 
-        if (!drift_detected) {
+        if (!drift_detected && enable_transfer) {
             warning_detected_only = true;
 
             shared_ptr<hoeffding_tree> tree_template =
@@ -185,10 +174,24 @@ bool trans_tree::transfer(Instance* instance) {
         // During drift warning period
         bbt_pool->warning_period_instances.push_back(instance);
 
-        return false;
+        if (bbt_pool->warning_period_instances.size() < least_transfer_warning_period_length) {
+            // cout << "-------------------------------------warning_period_instances size is not enough: "
+            //      << bbt_pool->warning_period_instances.size() << endl;
+            // bbt_pool = nullptr;
+            return false;
+        } else {
+            shared_ptr<hoeffding_tree> matched_tree =
+                    match_concept(bbt_pool->warning_period_instances);
+            if (matched_tree == nullptr) {
+                bbt_pool = nullptr;
+                return false;
+            } else {
+                bbt_pool->matched_tree = matched_tree;
+            }
+        }
     }
 
-    // After actual drift point, perform boosting with weight decrement
+    // After tree matching, perform boosting with weight decrement
     for (int j = 0; j < num_diff_distr_instances; j++) {
         Instance* transfer_instance = bbt_pool->get_next_diff_distr_instance();
         if (transfer_instance != nullptr) {
@@ -203,12 +206,13 @@ bool trans_tree::transfer(Instance* instance) {
         return false;
     }
 
-    foreground_tree->kappa = compute_kappa(foreground_tree->predicted_labels, actual_labels, instance->getNumberClasses());
+    foreground_tree->kappa = compute_kappa(foreground_tree->predicted_labels,
+                                           actual_labels,
+                                           instance->getNumberClasses());
 
     if (transfer_candidate->kappa - foreground_tree->kappa >= transfer_kappa_threshold
         && transfer_candidate->kappa >= transfer_kappa_threshold) {
 
-        // Update PEARL related data structs
         transfer_candidate->tree_pool_id = tree_pool.size();
         tree_pool.push_back(transfer_candidate);
 

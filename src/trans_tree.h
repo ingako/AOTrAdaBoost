@@ -52,6 +52,7 @@ public:
     vector<vector<shared_ptr<hoeffding_tree>>*> registered_tree_pools;
 
 private:
+    bool enable_transfer = true;
 
     int kappa_window_size;
     double warning_delta;
