@@ -114,9 +114,6 @@ void trans_tree::train() {
         foreground_tree->warning_detector->resetChange();
         foreground_tree->drift_detector->resetChange();
 
-        tree_pool.push_back(foreground_tree);
-        foreground_tree = foreground_tree->bg_tree;
-
         if (bbt_pool != nullptr) {
             // TODO allow concept match after actual drift?
             if (bbt_pool->warning_period_instances.size() < least_transfer_warning_period_length) {
@@ -134,6 +131,15 @@ void trans_tree::train() {
                 }
             }
         }
+
+        if (foreground_tree->bg_tree == nullptr) {
+            foreground_tree = make_tree(-1);
+        } else {
+            foreground_tree = foreground_tree->bg_tree;
+        }
+        foreground_tree->tree_pool_id = tree_pool.size();
+        tree_pool.push_back(foreground_tree);
+
     }
 
     // detect warning
@@ -144,7 +150,8 @@ void trans_tree::train() {
         if (!drift_detected) {
             warning_detected_only = true;
 
-            shared_ptr<hoeffding_tree> tree_template = foreground_tree->bg_tree;
+            shared_ptr<hoeffding_tree> tree_template =
+                    make_shared<hoeffding_tree>(*foreground_tree->bg_tree);
             bbt_pool = make_unique<boosted_bg_tree_pool>(
                     boost_mode,
                     bbt_pool_size,
@@ -281,7 +288,6 @@ int trans_tree::get_tree_pool_size() {
 }
 
 bool trans_tree::detect_change(int error_count, unique_ptr<HT::ADWIN>& detector) {
-
     double old_error = detector->getEstimation();
     bool error_change = detector->setInput(error_count);
 
@@ -346,6 +352,10 @@ hoeffding_tree::hoeffding_tree(hoeffding_tree const &rhs) :
             drift_delta(rhs.drift_delta),
             instance_store_size(rhs.instance_store_size) {
 
+    tree = make_unique<HT::HoeffdingTree>();
+    warning_detector = make_unique<HT::ADWIN>(warning_delta);
+    drift_detector = make_unique<HT::ADWIN>(drift_delta);
+    bg_tree = nullptr;
 }
 
 int hoeffding_tree::predict(Instance& instance, bool track_prediction) {

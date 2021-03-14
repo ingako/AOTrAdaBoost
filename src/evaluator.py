@@ -6,6 +6,7 @@ import time
 
 import numpy as np
 from sklearn.metrics import cohen_kappa_score
+from trans_pearl_wrapper import adaptive_random_forest, pearl, trans_pearl_wrapper, trans_tree_wrapper
 
 import sys
 paths = [r'..', r'../third_party']
@@ -105,7 +106,9 @@ class Evaluator:
             kappa = cohen_kappa_score(metric.window_actual_labels,
                                       metric.window_predicted_labels)
 
-            candidate_tree_size = classifier.get_candidate_tree_group_size()
+            candidate_tree_size = 0
+            if isinstance(classifier, trans_pearl_wrapper):
+                candidate_tree_size = classifier.get_candidate_tree_group_size()
             transferred_tree_size = classifier.get_transferred_tree_group_size()
             tree_pool_size = classifier.get_tree_pool_size()
 

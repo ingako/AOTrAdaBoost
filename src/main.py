@@ -14,7 +14,7 @@ from evaluator import Evaluator
 
 import sys
 # path = r'../'
-path = r'cmake-build-debug/'
+path = r'./cmake-build-debug-remote/'
 
 if path not in sys.path:
     sys.path.append(path)
@@ -23,7 +23,7 @@ if path not in sys.path:
 # libc = cdll.LoadLibrary("cmake-build-debug/trans_pearl_wrapper.cpython-37m-darwin.so")
 # libc = cdll.LoadLibrary("cmake-build-debug/trans_pearl_wrapper.cpython-37m-x86_64-linux-gnu.so")
 
-from trans_pearl_wrapper import adaptive_random_forest, pearl, trans_pearl_wrapper
+from trans_pearl_wrapper import adaptive_random_forest, pearl, trans_pearl_wrapper, trans_tree_wrapper
 
 formatter = logging.Formatter('%(message)s')
 
@@ -43,7 +43,11 @@ if __name__ == '__main__':
     # transfer learning params
     parser.add_argument("--transfer",
                         dest="transfer", action="store_true",
-                        help="Enable ProPearl")
+                        help="Enable transfer learning for PEARL")
+    parser.set_defaults(transfer=False)
+    parser.add_argument("--transfer_tree",
+                        dest="transfer_tree", action="store_true",
+                        help="Enable transfer learning for a single tree")
     parser.set_defaults(transfer=False)
     parser.add_argument("--transfer_streams_paths",
                         dest="transfer_streams_paths", default="", type=str,
@@ -205,6 +209,13 @@ if __name__ == '__main__':
                            f"{args.num_diff_distr_instances}/{args.eviction_interval}/" \
                            f"{args.transfer_kappa_threshold}/{args.bbt_pool_size}/" \
                            f"{args.boost_mode}/{args.generator_seed}/"
+
+    elif args.transfer_tree:
+        result_directory = f"{result_directory}/transfer-tree/" \
+                           f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
+                           f"{args.num_diff_distr_instances}/{args.eviction_interval}/" \
+                           f"{args.transfer_kappa_threshold}/{args.bbt_pool_size}/" \
+                           f"{args.boost_mode}/{args.generator_seed}/"
     else:
         result_directory = f"{result_directory}/pearl/{args.generator_seed}/"
 
@@ -289,6 +300,20 @@ if __name__ == '__main__':
 
         #         all_f.write(",".join([str(v) for v in all_predicted_drift_locs[i]]))
         #         all_f.write("\n")
+    elif args.transfer_tree:
+        classifier = trans_tree_wrapper(len(data_file_path.split(";")),
+                                         args.random_state,
+                                         args.kappa_window,
+                                         args.warning_delta,
+                                         args.drift_delta,
+                                         args.least_transfer_warning_period_instances_length,
+                                         args.instance_store_size,
+                                         args.num_diff_distr_instances,
+                                         args.bbt_pool_size,
+                                         args.eviction_interval,
+                                         args.transfer_kappa_threshold,
+                                         args.boost_mode)
+
 
     else:
         # TODO
