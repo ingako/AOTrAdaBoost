@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 
+import sys
+# path = r'../'
+path = r'./cmake-build-debug/'
+
+if path not in sys.path:
+    sys.path.append(path)
+
+from ctypes import *
+# libc = cdll.LoadLibrary("cmake-build-debug/trans_pearl_wrapper.cpython-37m-darwin.so")
+libc = cdll.LoadLibrary("cmake-build-debug/trans_pearl_wrapper.cpython-37m-x86_64-linux-gnu.so")
+
 import argparse
 import math
 import random
@@ -11,18 +22,6 @@ from collections import deque
 import numpy as np
 
 from evaluator import Evaluator
-
-import sys
-# path = r'../'
-path = r'./cmake-build-debug-remote/'
-
-if path not in sys.path:
-    sys.path.append(path)
-
-# from ctypes import *
-# libc = cdll.LoadLibrary("cmake-build-debug/trans_pearl_wrapper.cpython-37m-darwin.so")
-# libc = cdll.LoadLibrary("cmake-build-debug/trans_pearl_wrapper.cpython-37m-x86_64-linux-gnu.so")
-
 from trans_pearl_wrapper import adaptive_random_forest, pearl, trans_pearl_wrapper, trans_tree_wrapper
 
 formatter = logging.Formatter('%(message)s')
