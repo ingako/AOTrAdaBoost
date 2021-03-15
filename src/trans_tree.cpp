@@ -39,6 +39,10 @@ trans_tree::trans_tree(
 }
 
 double compute_kappa(deque<int> predicted_labels, deque<int> actual_labels, int class_count) {
+    if (predicted_labels.size() != actual_labels.size()) {
+        return std::numeric_limits<double>::min();
+    }
+
     // prepare confusion matrix
     vector<vector<int>> confusion_matrix(class_count, vector<int>(class_count, 0));
     int correct = 0;
@@ -84,7 +88,6 @@ double compute_kappa(deque<int> predicted_labels, deque<int> actual_labels, int 
 
 void trans_tree::init() {
     foreground_tree = make_tree(0);
-    tree_pool.push_back(foreground_tree);
 }
 
 shared_ptr<hoeffding_tree> trans_tree::make_tree(int tree_pool_id) {
@@ -117,6 +120,7 @@ void trans_tree::train() {
 
     // detect actual drift
     if (detect_change(error_count, foreground_tree->drift_detector)) {
+        cout << "actual_drift detected-------------------" << endl;
         drift_detected = true;
         foreground_tree->warning_detector->resetChange();
         foreground_tree->drift_detector->resetChange();
@@ -241,8 +245,7 @@ shared_ptr<hoeffding_tree> trans_tree::match_concept(vector<Instance*> warning_p
 
     for (auto registered_tree_pool : registered_tree_pools) {
         for (int i = 0; i < registered_tree_pool->size(); i++) {
-            auto tree = (*registered_tree_pool)[i];
-            shared_ptr<hoeffding_tree> trans_tree = static_pointer_cast<hoeffding_tree>(tree);
+            auto trans_tree = (*registered_tree_pool)[i];
 
             deque<int> predicted_labels;
             for (auto warning_period_instance : warning_period_instances) {
@@ -251,7 +254,7 @@ shared_ptr<hoeffding_tree> trans_tree::match_concept(vector<Instance*> warning_p
             }
 
             trans_tree->kappa = compute_kappa(predicted_labels, true_labels, class_count);
-            // cout << "match_concept trans_tree kappa: " << trans_tree->kappa << endl;
+            cout << "match_concept trans_tree kappa: " << trans_tree->kappa << endl;
             if (highest_kappa < trans_tree->kappa) {
                 highest_kappa = trans_tree->kappa;
                 matched_tree = trans_tree;
@@ -375,10 +378,12 @@ int hoeffding_tree::predict(Instance& instance, bool track_prediction) {
         }
     }
 
-    if (predicted_labels.size() >= kappa_window_size) {
-        predicted_labels.pop_front();
+    if (track_prediction) {
+        if (predicted_labels.size() >= kappa_window_size) {
+            predicted_labels.pop_front();
+        }
+        predicted_labels.push_back(result);
     }
-    predicted_labels.push_back(result);
 
     return result;
 }
@@ -489,8 +494,16 @@ Instance* trans_tree::boosted_bg_tree_pool::get_next_diff_distr_instance() {
 }
 
 void trans_tree::boosted_bg_tree_pool::perf_eval(Instance* instance) {
-    for (auto tree : pool) {
-        tree->predict(*instance, true);
+    for (int i = 0; i < pool.size(); i++) {
+        auto tree = pool[i];
+        int predicted_label = tree->predict(*instance, true);
+        int error_count = (int) (predicted_label != instance->getLabel());
+        if (trans_tree::detect_change(error_count, tree->drift_detector)) {
+            pool[i] = std::make_shared<hoeffding_tree>(*tree_template);
+        }
+        if (trans_tree::detect_change(error_count, tree->warning_detector)) {
+            // do nothing
+        }
     }
 }
 
@@ -530,19 +543,8 @@ void trans_tree::boosted_bg_tree_pool::update_bbt() {
 
 void trans_tree::boosted_bg_tree_pool::no_boost(Instance* instance) {
     // Only one tree exists in no_boost_mode
-    auto tree = pool[0];
-
-    // bagging
-    std::poisson_distribution<int> poisson_distr(lambda);
-    double k = poisson_distr(mrand);
-
-    double weight = instance->getWeight();
-    if (k > 0 && weight > 0) {
-        instance->setWeight(k * weight);
-
-        tree->train(*instance);
-        instance->setWeight(weight);
-    }
+    instance->setWeight(1);
+    pool[0]->train(*instance);
 }
 
 void trans_tree::boosted_bg_tree_pool::ozaboost(Instance* instance) {

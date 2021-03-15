@@ -31,7 +31,7 @@ public:
     int predict();
     void init();
     shared_ptr<hoeffding_tree> make_tree(int tree_pool_id);
-    bool detect_change(int error_count, unique_ptr<HT::ADWIN>& detector);
+    static bool detect_change(int error_count, unique_ptr<HT::ADWIN>& detector);
 
     int get_transferred_tree_group_size();
     int get_tree_pool_size();
