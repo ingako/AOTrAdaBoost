@@ -5,7 +5,7 @@
 #include <streamDM/learners/Classifiers/Trees/HoeffdingTree.h>
 #include <streamDM/learners/Classifiers/Trees/ADWIN.h>
 
-enum class boost_modes_enum { no_boost_mode, ozaboost_mode, tradaboost_mode, otradaboost_mode };
+enum class boost_modes_enum { no_boost_mode, ozaboost_mode, tradaboost_mode, otradaboost_mode, atradaboost_mode };
 double compute_kappa(deque<int> predicted_labels, deque<int> actual_labels, int class_count);
 
 class hoeffding_tree;
@@ -53,6 +53,7 @@ public:
 
 private:
     bool enable_transfer = true;
+    double beta = 3.0;
 
     int kappa_window_size;
     double warning_delta;
@@ -72,6 +73,7 @@ private:
                     { "ozaboost", boost_modes_enum::ozaboost_mode },
                     { "tradaboost", boost_modes_enum::tradaboost_mode },
                     { "otradaboost", boost_modes_enum::otradaboost_mode },
+                    { "atradaboost", boost_modes_enum::atradaboost_mode },
             };
     boost_modes_enum boost_mode = boost_modes_enum::otradaboost_mode;
     int least_transfer_warning_period_length = 50;
@@ -85,6 +87,7 @@ private:
     class boosted_bg_tree_pool {
     public:
         boost_modes_enum boost_mode = boost_modes_enum::otradaboost_mode;
+        double weight_factor = 1.0;
 
         boosted_bg_tree_pool(enum boost_modes_enum boost_mode,
                              int pool_size,
@@ -103,6 +106,24 @@ private:
         shared_ptr<hoeffding_tree> matched_tree = nullptr;
         int instance_store_idx = 0;
 
+        vector<double> oob_tree_correct_lam_sum; // count of out-of-bag correctly predicted trees per instance
+        vector<double> oob_tree_wrong_lam_sum; // count of out-of-bag incorrectly predicted trees per instance
+        vector<double> oob_tree_lam_sum; // count of oob trees per instance
+
+
+        // online tradaboost
+        vector<double> lam_sum_correct_src;
+        vector<double> lam_sum_wrong_src;
+        vector<double> error_src;
+
+        vector<double> lam_sum_correct_tgt;
+        vector<double> lam_sum_wrong_tgt;
+        vector<double> error_tgt;
+        vector<double> weight_distri_tgt;
+
+        double num_src_instances;
+
+
     private:
         double lambda = 1;
         double epsilon = 1;
@@ -115,9 +136,6 @@ private:
         double transfer_kappa_threshold = 0.3;
         shared_ptr<hoeffding_tree> tree_template;
         vector<shared_ptr<hoeffding_tree>> pool;
-        vector<double> oob_tree_correct_lam_sum; // count of out-of-bag correctly predicted trees per instance
-        vector<double> oob_tree_wrong_lam_sum; // count of out-of-bag incorrectly predicted trees per instance
-        vector<double> oob_tree_lam_sum; // count of oob trees per instance
 
         // execute replacement strategies when the bbt pool is full
         void update_bbt();
@@ -125,6 +143,7 @@ private:
         void ozaboost(Instance* instance);
         void tradaboost(Instance* instance, bool is_same_distribution);
         void otradaboost(Instance* instance, bool is_same_distribution);
+        void atradaboost(Instance* instance, bool is_same_distribution);
         void perf_eval(Instance* instance);
     };
 };
@@ -149,13 +168,12 @@ public:
 
     deque<Instance*> instance_store;
     int instance_store_size;
+    double warning_period_kappa = std::numeric_limits<double>::min();
 
 private:
     double warning_delta;
     double drift_delta;
 
 };
-
-
 
 #endif //TRANS_TREE_H

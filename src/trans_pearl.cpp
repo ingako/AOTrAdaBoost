@@ -910,6 +910,7 @@ void trans_pearl::boosted_bg_tree_pool::no_boost(Instance* instance) {
     // Only one tree exists in no_boost_mode
     auto tree = pool[0];
 
+    // TODO remove bagging?
     // bagging
     std::poisson_distribution<int> poisson_distr(lambda);
     double k = poisson_distr(mrand);

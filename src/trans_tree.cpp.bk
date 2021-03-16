@@ -116,12 +116,19 @@ void trans_tree::train() {
     int error_count = (int) (predicted_label != actual_label);
 
     bool warning_detected_only = false;
-    bool drift_detected = false;
+
+    // detect warning
+    if (detect_change(error_count, foreground_tree->warning_detector)) {
+        warning_detected_only = true;
+        foreground_tree->bg_tree = make_tree(-1);
+        foreground_tree->warning_detector->resetChange();
+
+    }
 
     // detect actual drift
     if (detect_change(error_count, foreground_tree->drift_detector)) {
+        warning_detected_only = false;
         cout << "actual_drift detected-------------------" << endl;
-        drift_detected = true;
         foreground_tree->warning_detector->resetChange();
         foreground_tree->drift_detector->resetChange();
 
@@ -132,38 +139,18 @@ void trans_tree::train() {
         } else {
             foreground_tree = foreground_tree->bg_tree;
         }
-
-        if (bbt_pool == nullptr) {
-            shared_ptr<hoeffding_tree> tree_template =
-                    make_shared<hoeffding_tree>(*make_tree(-1));
-            bbt_pool = make_unique<boosted_bg_tree_pool>(
-                    boost_mode,
-                    bbt_pool_size,
-                    eviction_interval,
-                    transfer_kappa_threshold,
-                    tree_template,
-                    1);
-        }
     }
 
-    // detect warning
-    if (detect_change(error_count, foreground_tree->warning_detector)) {
-        foreground_tree->bg_tree = make_tree(-1);
-        foreground_tree->warning_detector->resetChange();
-
-        if (!drift_detected && enable_transfer) {
-            warning_detected_only = true;
-
-            shared_ptr<hoeffding_tree> tree_template =
-                    make_shared<hoeffding_tree>(*foreground_tree->bg_tree);
-            bbt_pool = make_unique<boosted_bg_tree_pool>(
-                    boost_mode,
-                    bbt_pool_size,
-                    eviction_interval,
-                    transfer_kappa_threshold,
-                    tree_template,
-                    1);
-        }
+    if (warning_detected_only && enable_transfer) {
+        shared_ptr<hoeffding_tree> tree_template =
+                make_shared<hoeffding_tree>(*foreground_tree->bg_tree);
+        bbt_pool = make_unique<boosted_bg_tree_pool>(
+                boost_mode,
+                bbt_pool_size,
+                eviction_interval,
+                transfer_kappa_threshold,
+                tree_template,
+                1);
     }
 }
 
@@ -198,6 +185,7 @@ bool trans_tree::transfer(Instance* instance) {
             shared_ptr<hoeffding_tree> matched_tree =
                     match_concept(bbt_pool->warning_period_instances);
             if (matched_tree == nullptr) {
+                cout << "match_concept failed ---------------------------- " << endl;
                 bbt_pool = nullptr;
                 return false;
             } else {
@@ -274,13 +262,8 @@ shared_ptr<hoeffding_tree> trans_tree::match_concept(vector<Instance*> warning_p
         }
     }
 
-    if (boost_mode == boost_modes_enum::atradaboost_mode && matched_tree_idx != -1) {
-        bbt_pool->weight_factor = 1.0 / (1.0 + pow(highest_kappa / (1.0 - highest_kappa), -beta));
-    }
-
     cout << "------------------------------matched_tree_idx: " << matched_tree_idx
          << "| kappa: " << highest_kappa
-        << "| weight_factor: " << bbt_pool->weight_factor
          << "| size: " << instance_store_size << endl;
 
     return matched_tree;
@@ -447,21 +430,9 @@ trans_tree::boosted_bg_tree_pool::boosted_bg_tree_pool(
         lambda(lambda) {
 
     mrand = std::mt19937(42);
-
-    for (int i = 0; i < pool_size; i++) {
-        oob_tree_lam_sum.push_back(0);
-        oob_tree_correct_lam_sum.push_back(0);
-        oob_tree_wrong_lam_sum.push_back(0);
-
-        lam_sum_correct_src.push_back(0);
-        lam_sum_wrong_src.push_back(0);
-        error_src.push_back(0);
-
-        lam_sum_correct_tgt.push_back(0);
-        lam_sum_wrong_tgt.push_back(0);
-        error_tgt.push_back(0);
-        weight_distri_tgt.push_back(0);
-    }
+    oob_tree_lam_sum.resize(pool_size, 0);
+    oob_tree_correct_lam_sum.resize(pool_size, 0);
+    oob_tree_wrong_lam_sum.resize(pool_size, 0);
 
     // init BBT
     if (boost_mode == boost_modes_enum::no_boost_mode) {
@@ -485,6 +456,10 @@ void trans_tree::boosted_bg_tree_pool::online_boost(Instance *instance,
         if (boost_count % eviction_interval == 0) {
             update_bbt();
         }
+
+        std::fill(oob_tree_lam_sum.begin(), oob_tree_lam_sum.end(), 0);
+        std::fill(oob_tree_correct_lam_sum.begin(), oob_tree_correct_lam_sum.end(), 0);
+        std::fill(oob_tree_wrong_lam_sum.begin(), oob_tree_wrong_lam_sum.end(), 0);
     }
 
     switch(boost_mode) {
@@ -499,9 +474,6 @@ void trans_tree::boosted_bg_tree_pool::online_boost(Instance *instance,
             break;
         case boost_modes_enum::otradaboost_mode:
             this->otradaboost(instance, is_same_distribution);
-            break;
-        case boost_modes_enum::atradaboost_mode:
-            this->atradaboost(instance, is_same_distribution);
             break;
         default:
             cout << "Incorrect boost_mode" << endl;
@@ -549,9 +521,9 @@ shared_ptr<hoeffding_tree> trans_tree::boosted_bg_tree_pool::get_best_model(dequ
         }
     }
 
-    if (highest_kappa >= transfer_kappa_threshold) {
-        cout << "------------------------------pool_pos_idx: " << pool_pos_idx << endl;
-    }
+    // if (highest_kappa >= transfer_kappa_threshold) {
+    //     cout << "------------------------------pool_pos_idx: " << pool_pos_idx << endl;
+    // }
 
     return best_model;
 }
@@ -578,8 +550,6 @@ void trans_tree::boosted_bg_tree_pool::ozaboost(Instance* instance) {
     double lambda_d = 1;
     instance->setWeight(1);
 
-    // vector<double> lambda_vals;
-
     for (int i = 0; i < pool.size(); i++) {
         auto tree = pool[i];
 
@@ -588,7 +558,6 @@ void trans_tree::boosted_bg_tree_pool::ozaboost(Instance* instance) {
         double k = poisson_distr(mrand);
 
         double weight = instance->getWeight();
-        // oob_tree_lam_sum[i] += k*weight;
         if (k > 0 && weight > 0) {
             instance->setWeight(k * weight);
 
@@ -615,25 +584,12 @@ void trans_tree::boosted_bg_tree_pool::ozaboost(Instance* instance) {
                 lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
             }
         }
-        // lambda_vals.push_back(lambda_d);
     }
-
-    // cout << "lambdas: ";
-    // for (auto v : lambda_vals) {
-    //     cout << v << " ";
-    // }
-    // cout << endl;
 }
 
 void trans_tree::boosted_bg_tree_pool::tradaboost(Instance* instance, bool is_same_distribution) {
     double lambda_d = 1;
     instance->setWeight(1);
-    if (!is_same_distribution) {
-        num_src_instances += 1;
-    }
-    double beta = 1.0 / (1 + sqrt(2 * log(num_src_instances) / pool.size()));
-
-    vector<double> lambda_vals;
 
     for (int i = 0; i < pool.size(); i++) {
         auto tree = pool[i];
@@ -641,171 +597,133 @@ void trans_tree::boosted_bg_tree_pool::tradaboost(Instance* instance, bool is_sa
         // bagging
         std::poisson_distribution<int> poisson_distr(lambda_d);
         double k = poisson_distr(mrand);
-        if (k > 0) {
-            double weight = instance->getWeight();
+
+        double weight = instance->getWeight();
+        if (k > 0 && weight > 0) {
             instance->setWeight(k * weight);
 
             tree->train(*instance);
             instance->setWeight(weight);
         }
 
-        if (is_same_distribution) {
-            if (tree->predict(*instance, false) == instance->getLabel()) {
-                lam_sum_correct_tgt[i] += lambda_d;
-            } else {
-                lam_sum_wrong_tgt[i] += lambda_d;
-            }
+        oob_tree_lam_sum[i] += lambda_d;
+        bool correctly_classified;
+        if (tree->predict(*instance, false) == instance->getLabel()) {
+            oob_tree_correct_lam_sum[i] += lambda_d;
+            correctly_classified = true;
         } else {
-            if (tree->predict(*instance, false) == instance->getLabel()) {
-                lam_sum_correct_src[i] += lambda_d;
-            } else {
-                lam_sum_wrong_src[i] += lambda_d;
-            }
+            oob_tree_wrong_lam_sum[i] += lambda_d;
+            correctly_classified = false;
         }
 
-        double lam_sum = lam_sum_correct_tgt[i] + lam_sum_wrong_tgt[i] + lam_sum_correct_src[i] + lam_sum_wrong_src[i];
-        error_tgt[i] = lam_sum_wrong_tgt[i] / lam_sum;
-        error_src[i] = lam_sum_wrong_src[i] / lam_sum;
-        weight_distri_tgt[i] = (lam_sum_correct_tgt[i] + lam_sum_wrong_tgt[i]) / lam_sum;
-
-        double denom = 1 + weight_distri_tgt[i] - (1-beta) * error_src[i] - 2*error_tgt[i];
         if (is_same_distribution) {
-            if (tree->predict(*instance, false) == instance->getLabel()) {
-                lambda_d = lambda_d / denom;
+            if (correctly_classified) {
+                if (oob_tree_correct_lam_sum[i] >= epsilon) {
+                    lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                }
             } else {
-                lambda_d = lambda_d * (weight_distri_tgt[i] - error_tgt[i]) / (error_tgt[i] * denom);
+                if (oob_tree_wrong_lam_sum[i] >= epsilon) {
+                    lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                }
             }
         } else {
-            if (tree->predict(*instance, false) == instance->getLabel()) {
-                lambda_d = lambda_d / denom;
+            if (correctly_classified) {
+                if (oob_tree_wrong_lam_sum[i] >= epsilon) {
+                    lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                }
             } else {
-                lambda_d = lambda_d * beta / denom;
+                if (oob_tree_correct_lam_sum[i] >= epsilon) {
+                    lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                }
             }
         }
     }
 }
+
 
 void trans_tree::boosted_bg_tree_pool::otradaboost(Instance* instance, bool is_same_distribution) {
     double lambda_d = 1;
     instance->setWeight(1);
-    if (!is_same_distribution) {
-        num_src_instances += 1;
-    }
-    double beta = 1.0 / (1 + sqrt(2 * log(num_src_instances) / pool.size()));
 
-    vector<double> lambda_vals;
-
+    // cout << "lamb: " ;
     for (int i = 0; i < pool.size(); i++) {
         auto tree = pool[i];
 
         // bagging
         std::poisson_distribution<int> poisson_distr(lambda_d);
         double k = poisson_distr(mrand);
-        if (k > 0) {
-            double weight = instance->getWeight();
+
+        double weight = instance->getWeight();
+        if (k > 0 && weight > 0) {
             instance->setWeight(k * weight);
 
             tree->train(*instance);
             instance->setWeight(weight);
         }
 
+        // boosting based on out-of-bag errors
         if (k == 0) {
-            continue;
+            oob_tree_lam_sum[i] += lambda_d;
+            bool correctly_classified;
+            if (tree->predict(*instance, false) == instance->getLabel()) {
+                oob_tree_correct_lam_sum[i] += lambda_d;
+                correctly_classified = true;
+            } else {
+                oob_tree_wrong_lam_sum[i] += lambda_d;
+                correctly_classified = false;
+            }
+
+            // cout << "lambda_d: " << lambda_d << endl;
+            if (is_same_distribution) {
+                if (correctly_classified) {
+                    if (oob_tree_correct_lam_sum[i] >= epsilon) {
+                        lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                    }
+                } else {
+                    if (oob_tree_wrong_lam_sum[i] >= epsilon) {
+                        lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                    }
+                }
+            } else {
+                if (correctly_classified) {
+                    if (oob_tree_wrong_lam_sum[i] >= epsilon) {
+                        lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_wrong_lam_sum[i]);
+                    }
+                } else {
+                    if (oob_tree_correct_lam_sum[i] >= epsilon) {
+                        lambda_d *= oob_tree_lam_sum[i] / (2 * oob_tree_correct_lam_sum[i]);
+                    }
+                }
+            }
+
+            // if (lambda_d == std::numeric_limits<float>::infinity()) {
+            //     cout << "inf" << endl;
+            //     cout << "oob_tree_correct_lam_sum: " <<  oob_tree_correct_lam_sum[i] << endl;
+            //     cout << "oob_tree_wrong_lam_sum: " <<  oob_tree_wrong_lam_sum[i] << endl;
+            //     exit(1);
+            // }
         }
 
-        if (is_same_distribution) {
-            if (tree->predict(*instance, false) == instance->getLabel()) {
-                lam_sum_correct_tgt[i] += lambda_d;
-            } else {
-                lam_sum_wrong_tgt[i] += lambda_d;
-            }
-        } else {
-            if (tree->predict(*instance, false) == instance->getLabel()) {
-                lam_sum_correct_src[i] += lambda_d;
-            } else {
-                lam_sum_wrong_src[i] += lambda_d;
-            }
-        }
+        // cout << lambda_d << " ";
 
-        double lam_sum = lam_sum_correct_tgt[i] + lam_sum_wrong_tgt[i] + lam_sum_correct_src[i] + lam_sum_wrong_src[i];
-        error_tgt[i] = lam_sum_wrong_tgt[i] / lam_sum;
-        error_src[i] = lam_sum_wrong_src[i] / lam_sum;
-        weight_distri_tgt[i] = (lam_sum_correct_tgt[i] + lam_sum_wrong_tgt[i]) / lam_sum;
-
-        double denom = 1 + weight_distri_tgt[i] - (1-beta) * error_src[i] - 2*error_tgt[i];
-        if (is_same_distribution) {
-            if (tree->predict(*instance, false) == instance->getLabel()) {
-                lambda_d = lambda_d / denom;
-            } else {
-                lambda_d = lambda_d * (weight_distri_tgt[i] - error_tgt[i]) / (error_tgt[i] * denom);
-            }
-        } else {
-            if (tree->predict(*instance, false) == instance->getLabel()) {
-                lambda_d = lambda_d / denom;
-            } else {
-                lambda_d = lambda_d * beta / denom;
-            }
-        }
+        // if (lambda_d > 60835322454746) {
+        //     cout << endl;
+        //     cout << "correct: " << oob_tree_correct_lam_sum[i] << endl;
+        //     cout << "wrong: " << oob_tree_wrong_lam_sum[i] << endl;
+        //     cout << "total: " << oob_tree_lam_sum[i] << endl;
+        //     exit(1);
+        // }
     }
-}
+    // cout << endl;
 
-void trans_tree::boosted_bg_tree_pool::atradaboost(Instance* instance, bool is_same_distribution) {
-    double lambda_d = 1;
-    instance->setWeight(1);
-    if (!is_same_distribution) {
-        num_src_instances += 1;
-    }
-    double beta = 1.0 / (1 + sqrt(2 * log(num_src_instances) / pool.size()));
+    // cout << "oobc: ";
+    // for (auto l : oob_tree_correct_lam_sum) {
+    //     cout << l << " ";
+    // }
+    // cout << endl << "oobw: ";
+    // for (auto l : oob_tree_wrong_lam_sum) {
+    //     cout << l << " ";
+    // }
+    // cout << endl;
 
-    vector<double> lambda_vals;
-
-    for (int i = 0; i < pool.size(); i++) {
-        auto tree = pool[i];
-
-        // bagging
-        std::poisson_distribution<int> poisson_distr(lambda_d);
-        double k = poisson_distr(mrand);
-        if (k > 0) {
-            double weight = instance->getWeight();
-            instance->setWeight(k * weight);
-
-            tree->train(*instance);
-            instance->setWeight(weight);
-        }
-
-        if (is_same_distribution) {
-            if (tree->predict(*instance, false) == instance->getLabel()) {
-                lam_sum_correct_tgt[i] += lambda_d;
-            } else {
-                lam_sum_wrong_tgt[i] += lambda_d;
-            }
-        } else {
-            if (tree->predict(*instance, false) == instance->getLabel()) {
-                lam_sum_correct_src[i] += lambda_d;
-            } else {
-                lam_sum_wrong_src[i] += lambda_d;
-            }
-        }
-
-        double lam_sum = lam_sum_correct_tgt[i] + lam_sum_wrong_tgt[i] + lam_sum_correct_src[i] + lam_sum_wrong_src[i];
-        error_tgt[i] = lam_sum_wrong_tgt[i] / lam_sum;
-        error_src[i] = lam_sum_wrong_src[i] / lam_sum;
-        weight_distri_tgt[i] = (lam_sum_correct_tgt[i] + lam_sum_wrong_tgt[i]) / lam_sum;
-
-        double denom = 1 + weight_distri_tgt[i] - (1-beta) * error_src[i] - 2*error_tgt[i];
-        if (is_same_distribution) {
-            if (tree->predict(*instance, false) == instance->getLabel()) {
-                lambda_d = lambda_d / denom;
-            } else {
-                lambda_d = lambda_d * (weight_distri_tgt[i] - error_tgt[i]) / (error_tgt[i] * denom);
-            }
-        } else {
-            if (tree->predict(*instance, false) == instance->getLabel()) {
-                lambda_d = lambda_d / denom;
-            } else {
-                lambda_d = lambda_d * beta / denom;
-            }
-            lambda_d *= (1+weight_factor);
-        }
-    }
 }
