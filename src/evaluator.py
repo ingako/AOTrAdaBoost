@@ -39,38 +39,36 @@ class Evaluator:
                     sample_freq,
                     metrics_loggers,
                     expected_drift_locs_list,
-                    acc_per_drift_logger,
-                    stream_sequences):
+                    acc_per_drift_logger):
 
         classifier_metrics_list = []
         for i in range(len(data_file_paths)):
             classifier.init_data_source(i, data_file_paths[i])
             classifier_metrics_list.append(ClassifierMetrics())
 
-        stream_sequence = stream_sequences.popleft()
-        classifier_idx, switch_location = stream_sequence[0], stream_sequence[1]
+        classifier_idx = 0
         classifier.switch_classifier(classifier_idx)
         metric = classifier_metrics_list[classifier_idx]
         classifier_metrics_list[classifier_idx].start_time = time.process_time()
 
         # for count in range(0, max_samples):
-        for count in range(0, 120000):
-            # TOD0
-            if count == switch_location and len(stream_sequences) > 0:
+        while True:
+            if not classifier.get_next_instance():
                 # Switch streams to simulate parallel streams
                 metric.total_time += time.process_time() - metric.start_time
 
-                stream_sequence = stream_sequences.popleft()
-                classifier_idx, switch_location = stream_sequence[0], stream_sequence[1]
+                classifier_idx += 1
+                if classifier_idx >= len(data_file_paths):
+                    break
+
                 classifier.switch_classifier(classifier_idx)
                 metric = classifier_metrics_list[classifier_idx]
                 metric.start_time = time.process_time()
 
                 print()
                 print(f"switching to classifier_idx {classifier_idx}")
+                continue
 
-            if not classifier.get_next_instance():
-                break
             classifier_metrics_list[classifier_idx].instance_idx += 1
 
             # test

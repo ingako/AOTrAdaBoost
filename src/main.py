@@ -54,9 +54,6 @@ if __name__ == '__main__':
     parser.add_argument("--exp_code",
                         dest="exp_code", default="", type=str,
                         help="Experiment code for result logging path")
-    parser.add_argument("--exp_code_prefix",
-                        dest="exp_code_prefix", default="", type=str,
-                        help="Experiment code for result logging path")
     parser.add_argument("--least_transfer_warning_period_instances_length",
                         dest="least_transfer_warning_period_instances_length", default=50, type=int,
                         help="The least number of warning period instances needed to perform transfer learning")
@@ -190,16 +187,13 @@ if __name__ == '__main__':
 
     # prepare data
     if args.is_generated_data:
-        data_file_dir = f"data/{args.exp_code_prefix}/"
         data_file_path = args.transfer_streams_paths
         result_directory = f"{args.exp_code}/"
 
     else:
         # TODO
-        data_file_dir = f"../data/" \
-                         f"{args.dataset_name}/"
-        data_file_path = f"{data_file_dir}/{args.dataset_name}.{args.data_format}"
-        result_directory = args.dataset_name
+        data_file_path = args.transfer_streams_paths
+        result_directory = f"{args.exp_code}/"
 
     # set result logging directory for all streams
     if args.transfer:
@@ -222,16 +216,9 @@ if __name__ == '__main__':
 
     print(f"Preparing streams from files {data_file_path}...")
     for file_path in data_file_path.split(";"):
-        if not os.path.isfile(f'{file_path}/{args.generator_seed}.arff'):
-            print(f"Cannot locate file at {file_path}/{args.generator_seed}.arff")
+        if not os.path.isfile(file_path):
+            print(f"Cannot locate file at {file_path}")
             exit()
-
-    # prepare transfer sequences
-    stream_sequences_file_path = f"{data_file_dir}/sequence.txt"
-    stream_sequences = deque()
-    with open(f"{stream_sequences_file_path}", 'r') as f:
-        for line in f:
-            stream_sequences.append([int(v) for v in line.split()])
 
     # prepare metrics loggers for each stream
     metrics_loggers = []
@@ -247,16 +234,17 @@ if __name__ == '__main__':
     acc_per_drift_logger = setup_logger('acc_per_drift', f'{result_directory}/acc-per-drift-{args.generator_seed}.log')
 
     expected_drift_locs_list = []
-    for file_path in data_file_path.split(";"):
-        if not args.is_generated_data:
-            continue
-        # for calculating acc per drift
-        expected_drift_locs = deque()
-        expected_drift_locs_log = f"{file_path}/drift-{args.generator_seed}.log"
-        with open(f"{expected_drift_locs_log}", 'r') as f:
-            for line in f:
-                expected_drift_locs.append(int(line))
-        expected_drift_locs_list.append(expected_drift_locs)
+    if args.is_generated_data:
+        for file_path in data_file_path.split(";"):
+            if not args.is_generated_data:
+                continue
+            # for calculating acc per drift
+            expected_drift_locs = deque()
+            expected_drift_locs_log = f"{file_path}/drift-{args.generator_seed}.log"
+            with open(f"{expected_drift_locs_log}", 'r') as f:
+                for line in f:
+                    expected_drift_locs.append(int(line))
+            expected_drift_locs_list.append(expected_drift_locs)
 
 
     if args.transfer:
@@ -334,9 +322,10 @@ if __name__ == '__main__':
                       args.warning_delta,
                       args.drift_delta)
 
-    data_file_list = []
-    for file_path in data_file_path.split(";"):
-        data_file_list.append(f'{file_path}/{args.generator_seed}.arff')
+    # data_file_list = []
+    # for file_path in data_file_path.split(";"):
+    #     data_file_list.append(f'{file_path}/{args.generator_seed}.arff')
+    data_file_list = data_file_path.split(";")
 
     evaluator = Evaluator()
     evaluator.prequential_evaluation_transfer(
@@ -346,6 +335,5 @@ if __name__ == '__main__':
         sample_freq=args.sample_freq,
         metrics_loggers=metrics_loggers,
         expected_drift_locs_list=expected_drift_locs_list,
-        acc_per_drift_logger=acc_per_drift_logger,
-        stream_sequences=stream_sequences)
+        acc_per_drift_logger=acc_per_drift_logger)
 
