@@ -88,6 +88,17 @@ double compute_kappa(deque<int> predicted_labels, deque<int> actual_labels, int 
 
 void trans_tree::init() {
     foreground_tree = make_tree(0);
+
+    bbt_pool = make_unique<boosted_bg_tree_pool>(
+            boost_mode,
+            bbt_pool_size,
+            eviction_interval,
+            transfer_kappa_threshold,
+            make_tree(-1),
+            1);
+
+    foreground_tree->tree_pool_id = tree_pool.size();
+    tree_pool.push_back(foreground_tree);
 }
 
 shared_ptr<hoeffding_tree> trans_tree::make_tree(int tree_pool_id) {
@@ -125,13 +136,13 @@ void trans_tree::train() {
         foreground_tree->warning_detector->resetChange();
         foreground_tree->drift_detector->resetChange();
 
-        foreground_tree->tree_pool_id = tree_pool.size();
-        tree_pool.push_back(foreground_tree);
         if (foreground_tree->bg_tree == nullptr) {
             foreground_tree = make_tree(-1);
         } else {
             foreground_tree = foreground_tree->bg_tree;
         }
+        foreground_tree->tree_pool_id = tree_pool.size();
+        tree_pool.push_back(foreground_tree);
 
         if (bbt_pool == nullptr) {
             shared_ptr<hoeffding_tree> tree_template =
