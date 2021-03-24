@@ -13,6 +13,7 @@ trans_tree_wrapper::trans_tree_wrapper(
         int bbt_pool_size,
         int eviction_interval,
         double transfer_kappa_threshold,
+        double gamma,
         string boost_mode_str) {
 
     for (int i = 0; i < num_classifiers; i++) {
@@ -27,6 +28,7 @@ trans_tree_wrapper::trans_tree_wrapper(
                 bbt_pool_size,
                 eviction_interval,
                 transfer_kappa_threshold,
+                gamma,
                 boost_mode_str);
 
         classifiers.push_back(classifier);

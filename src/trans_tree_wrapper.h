@@ -19,6 +19,7 @@ public:
             int bbt_pool_size,
             int eviction_interval,
             double transfer_kappa_threshold,
+            double gamma,
             string boost_mode_str);
 
     void switch_classifier(int classifier_idx);

@@ -25,6 +25,7 @@ public:
             int bbt_pool_size, // tuning required
             int eviction_interval,
             double transfer_kappa_threshold,
+            double gamma,
             string boost_mode_str);
 
     void train();
@@ -53,7 +54,7 @@ public:
 
 private:
     bool enable_transfer = true;
-    double beta = 3.0;
+    double gamma = 3.0;
 
     int kappa_window_size;
     double warning_delta;

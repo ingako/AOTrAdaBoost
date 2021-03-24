@@ -72,6 +72,9 @@ if __name__ == '__main__':
     parser.add_argument("--transfer_kappa_threshold",
                         dest="transfer_kappa_threshold", default=0.3, type=float,
                         help="Kappa threshold for swapping foregournd tree with transfer tree")
+    parser.add_argument("--transfer_gamma",
+                        dest="transfer_gamma", default=3, type=float,
+                        help="Gamma for adaptive tradaboost")
     parser.add_argument("--boost_mode",
                         dest="boost_mode", default="otradaboost", type=str,
                         help="no_boost, ozaboost, tradaboost, otradaboost")
@@ -299,6 +302,7 @@ if __name__ == '__main__':
                                          args.bbt_pool_size,
                                          args.eviction_interval,
                                          args.transfer_kappa_threshold,
+                                         args.transfer_gamma,
                                          args.boost_mode)
 
 

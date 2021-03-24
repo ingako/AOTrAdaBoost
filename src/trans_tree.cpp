@@ -12,6 +12,7 @@ trans_tree::trans_tree(
         int bbt_pool_size,
         int eviction_interval,
         double transfer_kappa_threshold,
+        double gamma,
         string boost_mode_str) :
     kappa_window_size(kappa_window_size),
     warning_delta(warning_delta),
@@ -21,7 +22,8 @@ trans_tree::trans_tree(
     num_diff_distr_instances(num_diff_distr_instances),
     bbt_pool_size(bbt_pool_size),
     eviction_interval(eviction_interval),
-    transfer_kappa_threshold(transfer_kappa_threshold) {
+    transfer_kappa_threshold(transfer_kappa_threshold),
+    gamma(gamma) {
 
     mrand = std::mt19937(seed);
 
@@ -286,7 +288,8 @@ shared_ptr<hoeffding_tree> trans_tree::match_concept(vector<Instance*> warning_p
     }
 
     if (boost_mode == boost_modes_enum::atradaboost_mode && matched_tree_idx != -1) {
-        bbt_pool->weight_factor = 1.0 / (1.0 + pow(highest_kappa / (1.0 - highest_kappa), -beta));
+        // bbt_pool->weight_factor = 1.0 / (1.0 + pow(highest_kappa / (1.0 - highest_kappa), -gamma));
+        bbt_pool->weight_factor = tanh(gamma * highest_kappa);
     }
 
     cout << "------------------------------matched_tree_idx: " << matched_tree_idx
@@ -816,7 +819,8 @@ void trans_tree::boosted_bg_tree_pool::atradaboost(Instance* instance, bool is_s
             } else {
                 lambda_d = lambda_d * beta / denom;
             }
-            lambda_d *= (1+weight_factor);
+            // lambda_d *= (1+weight_factor);
+            lambda_d *= weight_factor;
         }
     }
 }
