@@ -207,11 +207,34 @@ if __name__ == '__main__':
                            f"{args.boost_mode}/{args.generator_seed}/"
 
     elif args.transfer_tree:
-        result_directory = f"{result_directory}/transfer-tree/" \
-                           f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
-                           f"{args.num_diff_distr_instances}/{args.eviction_interval}/" \
-                           f"{args.transfer_kappa_threshold}/{args.bbt_pool_size}/" \
-                           f"{args.boost_mode}/{args.generator_seed}/"
+        # result_directory = f"{result_directory}/transfer-tree/" \
+        #                    f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
+        #                    f"{args.num_diff_distr_instances}/{args.eviction_interval}/" \
+        #                    f"{args.transfer_kappa_threshold}/{args.bbt_pool_size}/" \
+        #                    f"{args.boost_mode}/{args.generator_seed}/"
+
+        result_directory = f"{result_directory}/{args.boost_mode}/"
+        if args.boost_mode == "disable_transfer":
+            pass
+        elif args.boost_mode == "no_boost":
+            result_directory = f"{result_directory}/" \
+                               f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
+                               f"{args.transfer_kappa_threshold}/"
+        elif args.boost_mode == "ozaboost" or args.boost_mode == "tradaboost":
+            result_directory = f"{result_directory}/" \
+                               f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
+                               f"{args.transfer_kappa_threshold}/" \
+                               f"{args.eviction_interval}/{args.num_diff_distr_instances}/{args.bbt_pool_size}/"
+        elif args.boost_mode == "atradaboost":
+            result_directory = f"{result_directory}/" \
+                               f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
+                               f"{args.transfer_kappa_threshold}/" \
+                               f"{args.eviction_interval}/{args.num_diff_distr_instances}/{args.bbt_pool_size}/" \
+                               f"{args.transfer_gamma}/"
+        else:
+            print("unsupported boost mode")
+            exit(1)
+
     else:
         result_directory = f"{result_directory}/pearl/{args.generator_seed}/"
 
