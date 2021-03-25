@@ -21,6 +21,7 @@ reuse_window = 0
 reuse_rate = 0.9
 lossy_window = 100000000
 
+
 generator = "agrawal"
 result_directory_prefix = f"bike-weekday-weekend"
 # result_directory_prefix = f"exp02-noise-0-0/"
@@ -28,17 +29,18 @@ result_directory_prefix = f"bike-weekday-weekend"
 # result_directory_prefix = f"exp02-noise-0.2-0.1/"
 # result_directory_prefix = f"exp02-imbalance-19-91/"
 
+
+# noboost     250    200          0.2
+# ozaboost    200    80           0.2        30         4500        0.4920000000000001
+# tradaboost  100    200          0.2        50         4500        0.4620000000000002
+# atradaboost 250    200          0.2        50         6.0         4500                0.5180000000000001
+
 seed=0
-least_transfer_warning_period_instances_length = 100 # [100 200 300]
-num_diff_distr_instances = 300 # [10 20 30 40 50]
-transfer_kappa_threshold = 0.1 # [0.1 0.2 0.3]
-bbt_pool_size = 10 # [10]
-transfer_gamma = 2.0
-
-# defaults
-eviction_interval = 1000000 # disabled
-instance_store_size = 5000 # default to 5000
-
+least_transfer_warning_period_instances_length = 250 # [100 200 300]
+num_diff_distr_instances = 200 # [10 20 30 40 50]
+transfer_kappa_threshold = 0.2 # [0.1 0.2 0.3]
+bbt_pool_size = 50 # [10]
+transfer_gamma = 6.0
 
 # stream_1_path = f"{transfer_result_path}/no_boost/{seed}/result-stream-0.csv"
 # stream_1 = pd.read_csv(stream_1_path, index_col=0)
@@ -55,18 +57,18 @@ for boost_mode in ["disable_transfer", "no_boost", "ozaboost", "tradaboost", "at
         pass
     elif boost_mode == "no_boost":
         result_directory = f"{result_directory}/" \
-                           f"{least_transfer_warning_period_instances_length}/{instance_store_size}/" \
+                           f"{least_transfer_warning_period_instances_length}/{num_diff_distr_instances}/" \
                            f"{transfer_kappa_threshold}/"
     elif boost_mode == "ozaboost" or boost_mode == "tradaboost":
         result_directory = f"{result_directory}/" \
-                           f"{least_transfer_warning_period_instances_length}/{instance_store_size}/" \
+                           f"{least_transfer_warning_period_instances_length}/{num_diff_distr_instances}/" \
                            f"{transfer_kappa_threshold}/" \
-                           f"{eviction_interval}/{num_diff_distr_instances}/{bbt_pool_size}/"
+                           f"{bbt_pool_size}/"
     elif boost_mode == "atradaboost":
         result_directory = f"{result_directory}/" \
-                           f"{least_transfer_warning_period_instances_length}/{instance_store_size}/" \
+                           f"{least_transfer_warning_period_instances_length}/{num_diff_distr_instances}/" \
                            f"{transfer_kappa_threshold}/" \
-                           f"{eviction_interval}/{num_diff_distr_instances}/{bbt_pool_size}/" \
+                           f"{bbt_pool_size}/" \
                            f"{transfer_gamma}/"
     else:
         print("unsupported boost mode")
