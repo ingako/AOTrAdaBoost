@@ -58,7 +58,7 @@ if __name__ == '__main__':
                         dest="least_transfer_warning_period_instances_length", default=50, type=int,
                         help="The least number of warning period instances needed to perform transfer learning")
     parser.add_argument("--instance_store_size",
-                        dest="instance_store_size", default=500, type=int,
+                        dest="instance_store_size", default=8000, type=int,
                         help="Number of instances stored in each tree for generating pseudo data with KNN")
     parser.add_argument("--num_diff_distr_instances",
                         dest="num_diff_distr_instances", default=30, type=int,
@@ -67,7 +67,7 @@ if __name__ == '__main__':
                         dest="bbt_pool_size", default=100, type=int,
                         help="The size of the background boosting tree pool")
     parser.add_argument("--eviction_interval",
-                        dest="eviction_interval", default=100, type=int,
+                        dest="eviction_interval", default=1000000, type=int,
                         help="Eviction interval for boosting")
     parser.add_argument("--transfer_kappa_threshold",
                         dest="transfer_kappa_threshold", default=0.3, type=float,
@@ -125,7 +125,7 @@ if __name__ == '__main__':
                         dest="max_samples", default=200000, type=int,
                         help="total number of samples")
     parser.add_argument("--sample_freq",
-                        dest="sample_freq", default=500, type=int,
+                        dest="sample_freq", default=100, type=int,
                         help="log interval for performance")
     parser.add_argument("--kappa_window",
                         dest="kappa_window", default=50, type=int,
@@ -202,34 +202,32 @@ if __name__ == '__main__':
     if args.transfer:
         result_directory = f"{result_directory}/transfer-pearl/" \
                            f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
-                           f"{args.num_diff_distr_instances}/{args.eviction_interval}/" \
+                           f"{args.num_diff_distr_instances}/" \
                            f"{args.transfer_kappa_threshold}/{args.bbt_pool_size}/" \
                            f"{args.boost_mode}/{args.generator_seed}/"
 
     elif args.transfer_tree:
-        # result_directory = f"{result_directory}/transfer-tree/" \
-        #                    f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
-        #                    f"{args.num_diff_distr_instances}/{args.eviction_interval}/" \
-        #                    f"{args.transfer_kappa_threshold}/{args.bbt_pool_size}/" \
-        #                    f"{args.boost_mode}/{args.generator_seed}/"
 
         result_directory = f"{result_directory}/{args.boost_mode}/"
         if args.boost_mode == "disable_transfer":
             pass
         elif args.boost_mode == "no_boost":
             result_directory = f"{result_directory}/" \
-                               f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
+                               f"{args.least_transfer_warning_period_instances_length}/" \
+                               f"{args.num_diff_distr_instances}/" \
                                f"{args.transfer_kappa_threshold}/"
         elif args.boost_mode == "ozaboost" or args.boost_mode == "tradaboost":
             result_directory = f"{result_directory}/" \
-                               f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
+                               f"{args.least_transfer_warning_period_instances_length}/" \
+                               f"{args.num_diff_distr_instances}/" \
                                f"{args.transfer_kappa_threshold}/" \
-                               f"{args.eviction_interval}/{args.num_diff_distr_instances}/{args.bbt_pool_size}/"
+                               f"{args.bbt_pool_size}/"
         elif args.boost_mode == "atradaboost":
             result_directory = f"{result_directory}/" \
-                               f"{args.least_transfer_warning_period_instances_length}/{args.instance_store_size}/" \
+                               f"{args.least_transfer_warning_period_instances_length}/" \
+                               f"{args.num_diff_distr_instances}/" \
                                f"{args.transfer_kappa_threshold}/" \
-                               f"{args.eviction_interval}/{args.num_diff_distr_instances}/{args.bbt_pool_size}/" \
+                               f"{args.bbt_pool_size}/" \
                                f"{args.transfer_gamma}/"
         else:
             print("unsupported boost mode")
