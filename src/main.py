@@ -189,14 +189,8 @@ if __name__ == '__main__':
         args.enable_state_adaption = True
 
     # prepare data
-    if args.is_generated_data:
-        data_file_path = args.transfer_streams_paths
-        result_directory = f"{args.exp_code}/"
-
-    else:
-        # TODO
-        data_file_path = args.transfer_streams_paths
-        result_directory = f"{args.exp_code}/"
+    data_file_path = args.transfer_streams_paths
+    result_directory = f"{args.exp_code}/"
 
     # set result logging directory for all streams
     if args.transfer:
@@ -232,6 +226,9 @@ if __name__ == '__main__':
         else:
             print("unsupported boost mode")
             exit(1)
+
+        if args.is_generated_data:
+            result_directory = f"{result_directory}/{args.generator_seed}/"
 
     else:
         result_directory = f"{result_directory}/pearl/{args.generator_seed}/"
@@ -351,6 +348,10 @@ if __name__ == '__main__':
     # for file_path in data_file_path.split(";"):
     #     data_file_list.append(f'{file_path}/{args.generator_seed}.arff')
     data_file_list = data_file_path.split(";")
+
+    if args.is_generated_data:
+        for i in range(len(data_file_list)):
+            data_file_list[i] = f"{data_file_list[i]}/{args.generator_seed}.arff"
 
     evaluator = Evaluator()
     evaluator.prequential_evaluation_transfer(
