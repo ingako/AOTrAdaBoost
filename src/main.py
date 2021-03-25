@@ -235,12 +235,6 @@ if __name__ == '__main__':
 
     pathlib.Path(result_directory).mkdir(parents=True, exist_ok=True)
 
-    print(f"Preparing streams from files {data_file_path}...")
-    for file_path in data_file_path.split(";"):
-        if not os.path.isfile(file_path):
-            print(f"Cannot locate file at {file_path}")
-            exit()
-
     # prepare metrics loggers for each stream
     metrics_loggers = []
     for idx in range(len(data_file_path.split(";"))):
@@ -352,6 +346,12 @@ if __name__ == '__main__':
     if args.is_generated_data:
         for i in range(len(data_file_list)):
             data_file_list[i] = f"{data_file_list[i]}/{args.generator_seed}.arff"
+            print(f"Preparing streams from files {data_file_list[i]}...")
+            for file_path in data_file_path.split(";"):
+                if not os.path.isfile(data_file_list[i]):
+                    print(f"Cannot locate file at {data_file_list[i]}")
+                    exit()
+
 
     evaluator = Evaluator()
     evaluator.prequential_evaluation_transfer(
