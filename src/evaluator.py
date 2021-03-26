@@ -103,6 +103,8 @@ class Evaluator:
             accuracy = metric.correct / sample_freq
             kappa = cohen_kappa_score(metric.window_actual_labels,
                                       metric.window_predicted_labels)
+            if math.isnan(kappa):
+                kappa = 0
 
             candidate_tree_size = 0
             if isinstance(classifier, trans_pearl_wrapper):
