@@ -24,16 +24,19 @@ disable_acc = disable_df["accuracy"]
 cur_data_dir = f"{base_dir}/{boost_mode}/"
 
 if boost_mode == "no_boost":
-    param_strs = ["least_transfer_warning_period_instances_length",
+    param_strs = ["kappa_window",
+                  "least_transfer_warning_period_instances_length",
                   "num_diff_distr_instances",
                   "transfer_kappa_threshold"]
 elif boost_mode == "ozaboost" or boost_mode == "tradaboost":
-    param_strs = ["least_transfer_warning_period_instances_length",
+    param_strs = ["kappa_window",
+                  "least_transfer_warning_period_instances_length",
                   "num_diff_distr_instances",
                   "transfer_kappa_threshold",
                   "bbt_pool_size"]
 elif boost_mode == "atradaboost":
-    param_strs = ["least_transfer_warning_period_instances_length",
+    param_strs = ["kappa_window",
+                  "least_transfer_warning_period_instances_length",
                   "num_diff_distr_instances",
                   "transfer_kappa_threshold",
                   "bbt_pool_size",
@@ -57,13 +60,14 @@ def eval_output(cur_data_dir, param_values, gain_report_out):
     if len(param_values) != len(param_strs):
         # recurse
         params = [f for f in os.listdir(cur_data_dir) if os.path.isdir(os.path.join(cur_data_dir, f))]
-        print(f"evaluating {params}...")
         for cur_param in params:
             param_values.append(cur_param)
             eval_output(f"{cur_data_dir}/{cur_param}", param_values, gain_report_out)
             param_values.pop()
 
     else:
+        print(f"evaluating {param_values}...")
+
         tradaboost_output = f"{cur_data_dir}/result-stream-1.csv"
         gain_output = f"{cur_data_dir}/gain.csv"
 
@@ -75,6 +79,7 @@ def eval_output(cur_data_dir, param_values, gain_report_out):
 
         tradaboost_disable_gain = 0
         end = len(tradaboost_acc)
+        # end = 150
 
         for i in range(0, end):
             tradaboost_disable_gain += tradaboost_acc[i] - disable_acc[i]
