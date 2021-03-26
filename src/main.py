@@ -128,7 +128,7 @@ if __name__ == '__main__':
                         dest="sample_freq", default=100, type=int,
                         help="log interval for performance")
     parser.add_argument("--kappa_window",
-                        dest="kappa_window", default=50, type=int,
+                        dest="kappa_window", default=60, type=int,
                         help="number of instances must be seen for calculating kappa")
     parser.add_argument("--poisson_lambda",
                         dest="poisson_lambda", default=6, type=int,
@@ -207,17 +207,20 @@ if __name__ == '__main__':
             pass
         elif args.boost_mode == "no_boost":
             result_directory = f"{result_directory}/" \
+                               f"{args.kappa_window}/" \
                                f"{args.least_transfer_warning_period_instances_length}/" \
                                f"{args.num_diff_distr_instances}/" \
                                f"{args.transfer_kappa_threshold}/"
         elif args.boost_mode == "ozaboost" or args.boost_mode == "tradaboost":
             result_directory = f"{result_directory}/" \
+                               f"{args.kappa_window}/" \
                                f"{args.least_transfer_warning_period_instances_length}/" \
                                f"{args.num_diff_distr_instances}/" \
                                f"{args.transfer_kappa_threshold}/" \
                                f"{args.bbt_pool_size}/"
         elif args.boost_mode == "atradaboost":
             result_directory = f"{result_directory}/" \
+                               f"{args.kappa_window}/" \
                                f"{args.least_transfer_warning_period_instances_length}/" \
                                f"{args.num_diff_distr_instances}/" \
                                f"{args.transfer_kappa_threshold}/" \
