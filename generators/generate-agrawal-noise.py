@@ -91,17 +91,5 @@ def generate(exp_code, concepts, noise_level):
                     out.write('\n')
 
 exp_code = 'noise-balanced'
-# generate(exp_code, concepts=[0,7], noise_level=0.3)
-# generate(exp_code, concepts=[0,7], noise_level=0.2)
-# generate(exp_code, concepts=[0,7], noise_level=0.1)
-generate(exp_code, concepts=[7,0], noise_level=0.3)
-generate(exp_code, concepts=[7,0], noise_level=0.2)
-generate(exp_code, concepts=[7,0], noise_level=0.1)
-# for v in range(1,10):
-    # generate(exp_code, concepts=[v, 0], noise_level=0.3)
-    # generate(exp_code, concepts=[v, 0], noise_level=0.2)
-    # generate(exp_code, concepts=[v, 0], noise_level=0.1)
-    # generate(exp_code, concepts=[v, 0], noise_level=0.25)
-    # generate(exp_code, concepts=[v, 0], noise_level=0.15)
-    # generate(exp_code, concepts=[v, 0], noise_level=0.05)
-    # generate(exp_code, concepts=[v, 0], noise_level=0)
+for noise_level in [0.0, 0.1, 0.2]:
+    generate(exp_code, concepts=[0,7], noise_level=noise_level)
