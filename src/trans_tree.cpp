@@ -289,7 +289,7 @@ shared_ptr<hoeffding_tree> trans_tree::match_concept(vector<Instance*> warning_p
 
     if (boost_mode == boost_modes_enum::atradaboost_mode && matched_tree_idx != -1) {
         // bbt_pool->weight_factor = 1.0 / (1.0 + pow(highest_kappa / (1.0 - highest_kappa), -gamma));
-        bbt_pool->weight_factor = tanh(gamma * highest_kappa);
+        bbt_pool->weight_factor = 2 * tanh(gamma * highest_kappa);
     }
 
     cout << "------------------------------matched_tree_idx: " << matched_tree_idx
@@ -768,6 +768,7 @@ void trans_tree::boosted_bg_tree_pool::atradaboost(Instance* instance, bool is_s
     instance->setWeight(1);
     if (!is_same_distribution) {
         num_src_instances += 1;
+        lambda_d *= weight_factor;
     }
     double beta = 1.0 / (1 + sqrt(2 * log(num_src_instances) / pool.size()));
 
@@ -820,7 +821,7 @@ void trans_tree::boosted_bg_tree_pool::atradaboost(Instance* instance, bool is_s
                 lambda_d = lambda_d * beta / denom;
             }
             // lambda_d *= (1+weight_factor);
-            lambda_d *= weight_factor;
+            // lambda_d *= weight_factor;
         }
     }
 }
