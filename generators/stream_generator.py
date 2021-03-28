@@ -33,6 +33,7 @@ class RecurrentDriftStream(ConceptDriftStream):
                  stable_period_logger=None,
                  drift_interval_distr="poisson",
                  balance_classes=False,
+                 imbalance_ratio=0.5,
                  random_state=0):
 
         super().__init__()
@@ -78,6 +79,7 @@ class RecurrentDriftStream(ConceptDriftStream):
         self.all_concepts = all_concepts
         self.total_sample_idx = 0
         self.balance_classes=balance_classes
+        self.imbalance_ratio=imbalance_ratio
 
     def next_sample(self, batch_size=1):
 
@@ -169,6 +171,7 @@ class RecurrentDriftStream(ConceptDriftStream):
                 stream = AGRAWALGenerator(classification_function=concept,
                                           random_state=self.random_state,
                                           balance_classes=self.balance_classes,
+                                          imbalance_ratio=self.imbalance_ratio,
                                           perturbation=0.05)
                 stream.prepare_for_use()
                 self.streams.append(stream)
@@ -179,6 +182,7 @@ class RecurrentDriftStream(ConceptDriftStream):
                     stream = AGRAWALGenerator(classification_function=concept,
                                               random_state=self.random_state,
                                               balance_classes=self.balance_classes,
+                                              imbalance_ratio=self.imbalance_ratio,
                                               perturbation=0.05)
                 elif self.generator == 'sea':
                     stream = SEAGenerator(classification_function=concept,
