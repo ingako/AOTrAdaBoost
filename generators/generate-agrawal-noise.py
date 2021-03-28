@@ -24,17 +24,14 @@ def setup_logger(name, log_file, level=logging.INFO):
 
     return logger
 
-def generate(exp_code, concepts, noise_level):
+def generate(exp_code, concepts, noise_level, drift_type):
     max_samples = 15000
     generator = 'agrawal'
-    drift_type = 'abrupt'
-    # data_dir_prefix = '../data/exp01/037'
     data_dir_prefix = f'../data/{exp_code}/'
     data_dir_suffix = ''.join([str(v) for v in concepts])
     data_dir_suffix = f'{data_dir_suffix}/{noise_level}'
 
     for param in [(-1, "uniform")]:
-        # dir_suffix = f'{generator}/{drift_type}/{str(param[0])}/stream2/'
         data_dir = f'{data_dir_prefix}/{data_dir_suffix}'
 
         for seed in range(0, 10):
@@ -62,11 +59,17 @@ def generate(exp_code, concepts, noise_level):
                                               random_state=seed)
             elif drift_type == "gradual":
                 stream = RecurrentDriftStream(generator=generator,
-                                              width=1000,
-                                              concepts=[4, 0, 8, 6, 2, 1, 3, 5, 7, 9],
-                                              has_noise=False,
-                                              stable_period=6000,
-                                              position=5000,
+                                              width=500,
+                                              # concepts=[0, 3, 7],
+                                              concepts=concepts,
+                                              has_noise=True,
+                                              noise_level=noise_level,
+                                              # stable_period_lam=param[0],
+                                              # stable_period_start=1000,
+                                              # stable_period_base=200,
+                                              balance_classes=True,
+                                              stable_period=8000,
+                                              position=8000,
                                               stable_period_logger=logger,
                                               random_state=seed)
             else:
@@ -90,6 +93,11 @@ def generate(exp_code, concepts, noise_level):
                     out.write(f',{y[0]}')
                     out.write('\n')
 
-exp_code = 'noise-balanced'
+exp_code = 'noise-balanced-gradual-500'
+drift_type = 'gradual'
+# exp_code = 'noise-balanced'
+# drift_type = 'abrupt'
+# exp_code = 'noise-balanced-gradual'
+# drift_type = 'gradual'
 for noise_level in [0.0, 0.1, 0.2]:
-    generate(exp_code, concepts=[0,7], noise_level=noise_level)
+    generate(exp_code, concepts=[7,0], noise_level=noise_level, drift_type=drift_type)

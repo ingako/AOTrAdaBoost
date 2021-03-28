@@ -24,10 +24,9 @@ def setup_logger(name, log_file, level=logging.INFO):
 
     return logger
 
-def generate(exp_code, concepts, imbalance_ratio):
+def generate(exp_code, concepts, imbalance_ratio, drift_type):
     max_samples = 15000
     generator = 'agrawal'
-    drift_type = 'abrupt'
     data_dir_prefix = f'../data/{exp_code}/'
     concepts_str = ''.join([str(v) for v in concepts])
     imbalance_ratio_str = str(imbalance_ratio)
@@ -57,15 +56,21 @@ def generate(exp_code, concepts, imbalance_ratio):
                                               stable_period=8000,
                                               position=8000,
                                               stable_period_logger=logger,
+                                              imbalance_ratio=imbalance_ratio,
                                               random_state=seed)
             elif drift_type == "gradual":
                 stream = RecurrentDriftStream(generator=generator,
                                               width=1000,
-                                              concepts=[4, 0, 8, 6, 2, 1, 3, 5, 7, 9],
+                                              concepts=concepts,
                                               has_noise=False,
-                                              stable_period=6000,
-                                              position=5000,
+                                              # noise_level=noise_level,
+                                              # stable_period_lam=param[0],
+                                              # stable_period_start=1000,
+                                              # stable_period_base=200,
+                                              stable_period=8000,
+                                              position=8000,
                                               stable_period_logger=logger,
+                                              imbalance_ratio=imbalance_ratio,
                                               random_state=seed)
             else:
                 print(f"Unknown drift type {drift_type}")
@@ -89,7 +94,6 @@ def generate(exp_code, concepts, imbalance_ratio):
                     out.write('\n')
 
 exp_code = 'imbalance'
-generate(exp_code, concepts=[7,0], imbalance_ratio=0.1)
-generate(exp_code, concepts=[7,0], imbalance_ratio=0.9)
-generate(exp_code, concepts=[7,0], imbalance_ratio=0.3)
-generate(exp_code, concepts=[7,0], imbalance_ratio=0.7)
+drift_type = 'gradual'
+for ratio in [0.1, 0.9, 0.3, 0.7]:
+    generate(exp_code, concepts=[7,0], imbalance_ratio=ratio, drift_type=drift_type)
