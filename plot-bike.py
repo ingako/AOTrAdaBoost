@@ -51,10 +51,10 @@ for boost_mode in ["disable_transfer", "no_boost", "ozaboost", "tradaboost", "at
                            f"{transfer_kappa_threshold}/" \
                            f"{bbt_pool_size}/"
         if boost_mode == "ozaboost":
-            boost_mode_label = "Ozaboost"
+            boost_mode_label = "OzaBoost"
             linestyle = '--'
         if boost_mode == "tradaboost":
-            boost_mode_label = "TrAdaboost"
+            boost_mode_label = "TrAdaBoost"
             linestyle = '-.'
     elif boost_mode == "atradaboost":
         result_directory = f"{result_directory}/" \
@@ -64,7 +64,7 @@ for boost_mode in ["disable_transfer", "no_boost", "ozaboost", "tradaboost", "at
                            f"{transfer_kappa_threshold}/" \
                            f"{bbt_pool_size}/" \
                            f"{transfer_gamma}/"
-        boost_mode_label = "AOTrAdaboost"
+        boost_mode_label = "AOTrAdaBoost"
         linestyle = ':'
     else:
         print("unsupported boost mode")
