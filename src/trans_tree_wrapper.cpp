@@ -14,6 +14,7 @@ trans_tree_wrapper::trans_tree_wrapper(
         int eviction_interval,
         double transfer_kappa_threshold,
         double gamma,
+        double transfer_match_lowerbound,
         string boost_mode_str) {
 
     for (int i = 0; i < num_classifiers; i++) {
@@ -29,6 +30,7 @@ trans_tree_wrapper::trans_tree_wrapper(
                 eviction_interval,
                 transfer_kappa_threshold,
                 gamma,
+                transfer_match_lowerbound,
                 boost_mode_str);
 
         classifiers.push_back(classifier);

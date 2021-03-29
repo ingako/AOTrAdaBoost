@@ -20,6 +20,7 @@ public:
             int eviction_interval,
             double transfer_kappa_threshold,
             double gamma,
+            double transfer_match_lowerbound,
             string boost_mode_str);
 
     void switch_classifier(int classifier_idx);

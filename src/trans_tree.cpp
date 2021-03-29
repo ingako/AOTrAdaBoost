@@ -13,6 +13,7 @@ trans_tree::trans_tree(
         int eviction_interval,
         double transfer_kappa_threshold,
         double gamma,
+        double transfer_match_lowerbound,
         string boost_mode_str) :
     kappa_window_size(kappa_window_size),
     warning_delta(warning_delta),
@@ -23,6 +24,7 @@ trans_tree::trans_tree(
     bbt_pool_size(bbt_pool_size),
     eviction_interval(eviction_interval),
     transfer_kappa_threshold(transfer_kappa_threshold),
+    transfer_match_lowerbound(transfer_match_lowerbound),
     gamma(gamma) {
 
     mrand = std::mt19937(seed);
@@ -257,7 +259,7 @@ bool trans_tree::transfer(Instance* instance) {
 
 shared_ptr<hoeffding_tree> trans_tree::match_concept(vector<Instance*> warning_period_instances) {
     shared_ptr<hoeffding_tree> matched_tree = nullptr;
-    double highest_kappa = 0.0;
+    double highest_kappa = transfer_match_lowerbound;
     int matched_tree_idx = -1;
 
     // For kappa calculation
@@ -280,7 +282,6 @@ shared_ptr<hoeffding_tree> trans_tree::match_concept(vector<Instance*> warning_p
             trans_tree->kappa = compute_kappa(predicted_labels, true_labels, class_count);
             cout << "match_concept trans_tree kappa: " << trans_tree->kappa << endl;
             if (highest_kappa < trans_tree->kappa) {
-            // if (highest_kappa <= trans_tree->kappa) {
                 highest_kappa = trans_tree->kappa;
                 matched_tree = trans_tree;
                 matched_tree_idx = i;

@@ -75,6 +75,9 @@ if __name__ == '__main__':
     parser.add_argument("--transfer_gamma",
                         dest="transfer_gamma", default=3, type=float,
                         help="Gamma for adaptive tradaboost")
+    parser.add_argument("--transfer_match_lowerbound",
+                        dest="transfer_match_lowerbound", default=0.0, type=float,
+                        help="Lowerbound for matched the tree's kappa")
     parser.add_argument("--boost_mode",
                         dest="boost_mode", default="otradaboost", type=str,
                         help="no_boost, ozaboost, tradaboost, otradaboost")
@@ -207,12 +210,14 @@ if __name__ == '__main__':
             pass
         elif args.boost_mode == "no_boost":
             result_directory = f"{result_directory}/" \
+                               f"{args.transfer_match_lowerbound}/" \
                                f"{args.kappa_window}/" \
                                f"{args.least_transfer_warning_period_instances_length}/" \
                                f"{args.num_diff_distr_instances}/" \
                                f"{args.transfer_kappa_threshold}/"
         elif args.boost_mode == "ozaboost" or args.boost_mode == "tradaboost":
             result_directory = f"{result_directory}/" \
+                               f"{args.transfer_match_lowerbound}/" \
                                f"{args.kappa_window}/" \
                                f"{args.least_transfer_warning_period_instances_length}/" \
                                f"{args.num_diff_distr_instances}/" \
@@ -220,6 +225,7 @@ if __name__ == '__main__':
                                f"{args.bbt_pool_size}/"
         elif args.boost_mode == "atradaboost":
             result_directory = f"{result_directory}/" \
+                               f"{args.transfer_match_lowerbound}/" \
                                f"{args.kappa_window}/" \
                                f"{args.least_transfer_warning_period_instances_length}/" \
                                f"{args.num_diff_distr_instances}/" \
@@ -318,6 +324,7 @@ if __name__ == '__main__':
                                          args.eviction_interval,
                                          args.transfer_kappa_threshold,
                                          args.transfer_gamma,
+                                         args.transfer_match_lowerbound,
                                          args.boost_mode)
 
 

@@ -172,6 +172,7 @@ PYBIND11_MODULE(trans_pearl_wrapper, m) {
                     int,
                     double,
                     double,
+                    double,
                     string>())
             .def("init_data_source", &trans_tree_wrapper::init_data_source)
             .def("get_next_instance", &trans_tree_wrapper::get_next_instance)

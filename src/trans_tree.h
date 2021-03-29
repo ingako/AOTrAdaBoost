@@ -26,6 +26,7 @@ public:
             int eviction_interval,
             double transfer_kappa_threshold,
             double gamma,
+            double transfer_match_lowerbound,
             string boost_mode_str);
 
     void train();
@@ -55,6 +56,7 @@ public:
 private:
     bool enable_transfer = true;
     double gamma = 3.0;
+    double transfer_match_lowerbound = 0.0;
 
     int kappa_window_size;
     double warning_delta;
