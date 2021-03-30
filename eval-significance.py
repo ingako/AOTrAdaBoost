@@ -12,13 +12,17 @@ from scipy.stats import friedmanchisquare
 
 generators = [
     "noise-0.0-0.0",
-    "noise-0.2-0.0",
-    "noise-0.2-0.1"
+    # "noise-0.1-0.0",
+    "noise-0.2-0.1",
+    "tree/noise-0.0-0.0",
+    "tree/noise-0.1-0.0",
+    # "tree/noise-0.2-0.1"
 ]
 
 @dataclass
 class Param:
     generator: str = "covtype"
+    transfer_match_lowerbound: float = 0.0
     kappa_window: int = 60
     least_transfer_warning_period_instances_length: int = 100
     num_diff_distr_instances: int = 300
@@ -40,13 +44,13 @@ benchmark_params_list = [
         gamma = 4.0
     ),
 
-    Param(
-        least_transfer_warning_period_instances_length = 100,
-        num_diff_distr_instances = 300,
-        transfer_kappa_threshold = 0.3,
-        bbt_pool_size = 50,
-        gamma = 7.0
-    ),
+    # Param(
+    #     least_transfer_warning_period_instances_length = 100,
+    #     num_diff_distr_instances = 300,
+    #     transfer_kappa_threshold = 0.3,
+    #     bbt_pool_size = 50,
+    #     gamma = 7.0
+    # ),
 
     Param(
         least_transfer_warning_period_instances_length = 100,
@@ -54,8 +58,26 @@ benchmark_params_list = [
         transfer_kappa_threshold = 0.3,
         bbt_pool_size = 10,
         gamma = 4.0
-    )
+    ),
 
+    # tree
+    Param(
+        # exp_code= 'tree/noise-0.0-0.0',
+        least_transfer_warning_period_instances_length = 200,
+        num_diff_distr_instances = 100,
+        transfer_kappa_threshold = 0.3,
+        bbt_pool_size = 50,
+        gamma = 1.0
+    ),
+
+    Param(
+        # exp_code= 'tree/noise-0.1-0.0',
+        least_transfer_warning_period_instances_length = 300,
+        num_diff_distr_instances = 300,
+        transfer_kappa_threshold = 0.2,
+        bbt_pool_size = 10,
+        gamma = 10.0
+    )
 ]
 
 def is_empty_file(fpath):
@@ -87,12 +109,14 @@ for i in range(len(generators)): # for each dataset
 
             if boost_mode == "no_boost":
                 path = f"{path}/" \
+                       f"{p.transfer_match_lowerbound}/" \
                        f"{p.kappa_window}/" \
                        f"{p.least_transfer_warning_period_instances_length}/" \
                        f"{p.num_diff_distr_instances}/" \
                        f"{p.transfer_kappa_threshold}/"
             elif boost_mode == "ozaboost" or boost_mode == "tradaboost":
                 path = f"{path}/" \
+                       f"{p.transfer_match_lowerbound}/" \
                        f"{p.kappa_window}/" \
                        f"{p.least_transfer_warning_period_instances_length}/" \
                        f"{p.num_diff_distr_instances}/" \
@@ -100,6 +124,7 @@ for i in range(len(generators)): # for each dataset
                        f"{p.bbt_pool_size}/"
             elif boost_mode == "atradaboost":
                 path = f"{path}/" \
+                       f"{p.transfer_match_lowerbound}/" \
                        f"{p.kappa_window}/" \
                        f"{p.least_transfer_warning_period_instances_length}/" \
                        f"{p.num_diff_distr_instances}/" \
