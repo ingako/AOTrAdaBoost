@@ -105,9 +105,13 @@ for p in params:
             benchmark_df = pd.read_csv(result_path)
 
             metrics = []
-            acc_list.append(benchmark_df["accuracy"].mean())
-            kappa_list.append(benchmark_df["kappa"].mean())
-            time_list.append(benchmark_df["time"].iloc[-1]/60)
+
+            # acc_list.append(benchmark_df["accuracy"].mean())
+            # kappa_list.append(benchmark_df["kappa"].mean())
+            # time_list.append(benchmark_df["time"].iloc[-1]/60)
+            acc_list.extend(benchmark_df["accuracy"].to_list())
+            kappa_list.extend(benchmark_df["kappa"].to_list())
+            time_list.append(benchmark_df["time"].iloc[-1])
 
             if boost_mode == "disable_transfer":
                 acc_gain_list.append(0)
