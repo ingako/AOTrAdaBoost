@@ -210,8 +210,11 @@ class RecurrentDriftStream(ConceptDriftStream):
                     stream = RandomTreeGenerator(tree_random_state=concept,
                                                  sample_random_state=concept,
                                                  max_tree_depth=concept+2,
+                                                 # max_tree_depth=concept,
                                                  min_leaf_depth=concept,
-                                                 n_classes=2)
+                                                 n_classes=2,
+                                                 has_noise=self.has_noise,
+                                                 noise_level=self.noise_level)
                 else:
                     print(f"unknown stream generator {self.generator}")
                     exit()
