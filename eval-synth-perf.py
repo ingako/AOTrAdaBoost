@@ -27,113 +27,124 @@ class Param:
     bbt_pool_size: int = 40
     gamma: float = 4
 
-noise_agrawal_0_0 = \
-    Param(
-        exp_code= 'noise-0.0-0.0',
-        least_transfer_warning_period_instances_length = 100,
-        num_diff_distr_instances = 300,
-        transfer_kappa_threshold = 0.4,
-        bbt_pool_size = 40,
-        gamma = 4.0
-    )
-
-noise_agrawal_2_1 = \
-    Param(
-        exp_code= 'noise-0.2-0.1',
-        least_transfer_warning_period_instances_length = 100,
-        num_diff_distr_instances = 300,
-        transfer_kappa_threshold = 0.3,
-        bbt_pool_size = 10,
-        gamma = 4.0
-    )
-
-noise_agrawal_0_0_gradual = \
-    Param(
-        exp_code= 'noise-0.0-0.0-gradual',
-        least_transfer_warning_period_instances_length = 150,
-        num_diff_distr_instances = 300,
-        transfer_kappa_threshold = 0.2,
-        bbt_pool_size = 30,
-        gamma = 5.0
-    )
-
-# #TODO
-# noise_agrawal_1_0_gradual = \
+# noise_agrawal_0_0 = \
 #     Param(
-#         exp_code= 'noise-0.1-0.0-gradual',
+#         exp_code= 'noise-0.0-0.0',
 #         least_transfer_warning_period_instances_length = 100,
 #         num_diff_distr_instances = 300,
 #         transfer_kappa_threshold = 0.4,
 #         bbt_pool_size = 40,
 #         gamma = 4.0
 #     )
-
-noise_agrawal_2_1_gradual = \
-    Param(
-        exp_code= 'noise-0.2-0.1-gradual',
-        least_transfer_warning_period_instances_length = 400,
-        num_diff_distr_instances = 200,
-        transfer_kappa_threshold = 0.2,
-        bbt_pool_size = 30,
-        gamma = 6.0
-    )
-
-params = [noise_agrawal_0_0, noise_agrawal_2_1,
-          noise_agrawal_0_0_gradual, noise_agrawal_2_1_gradual]
-
-####################################################################
-
-# noise_tree_0_0 = \
-#     Param(
-#         exp_code= 'tree/noise-0.0-0.0',
-#         least_transfer_warning_period_instances_length = 200,
-#         num_diff_distr_instances = 100,
-#         transfer_kappa_threshold = 0.3,
-#         bbt_pool_size = 50,
-#         gamma = 1.0
-#     )
 # 
-# noise_tree_1_0 = \
+# noise_agrawal_2_1 = \
 #     Param(
-#         exp_code= 'tree/noise-0.1-0.0',
-#         least_transfer_warning_period_instances_length = 300,
-#         num_diff_distr_instances = 300,
-#         transfer_kappa_threshold = 0.2,
-#         bbt_pool_size = 10,
-#         gamma = 10.0
-#     )
-# 
-# noise_tree_2_1 = \
-#     Param(
-#         exp_code= 'tree/noise-0.2-0.1',
+#         exp_code= 'noise-0.2-0.1',
 #         least_transfer_warning_period_instances_length = 100,
 #         num_diff_distr_instances = 300,
+#         transfer_kappa_threshold = 0.3,
+#         bbt_pool_size = 10,
+#         gamma = 4.0
+#     )
+# 
+# noise_agrawal_0_0_gradual = \
+#     Param(
+#         exp_code= 'noise-0.0-0.0-gradual',
+#         least_transfer_warning_period_instances_length = 150,
+#         num_diff_distr_instances = 300,
 #         transfer_kappa_threshold = 0.2,
-#         bbt_pool_size = 20,
+#         bbt_pool_size = 30,
+#         gamma = 5.0
+#     )
+# 
+# # #TODO
+# # noise_agrawal_1_0_gradual = \
+# #     Param(
+# #         exp_code= 'noise-0.1-0.0-gradual',
+# #         least_transfer_warning_period_instances_length = 100,
+# #         num_diff_distr_instances = 300,
+# #         transfer_kappa_threshold = 0.4,
+# #         bbt_pool_size = 40,
+# #         gamma = 4.0
+# #     )
+# 
+# noise_agrawal_2_1_gradual = \
+#     Param(
+#         exp_code= 'noise-0.2-0.1-gradual',
+#         least_transfer_warning_period_instances_length = 400,
+#         num_diff_distr_instances = 200,
+#         transfer_kappa_threshold = 0.2,
+#         bbt_pool_size = 30,
 #         gamma = 6.0
 #     )
 # 
-# noise_tree_0_0_gradual = \
+# noise_agrawal_2_1_case = \
 #     Param(
-#         exp_code= 'tree/noise-0.0-0.0',
-#         least_transfer_warning_period_instances_length = 200,
-#         num_diff_distr_instances = 100,
+#         exp_code= 'noise-0.2-0.1-case',
+#         least_transfer_warning_period_instances_length = 100,
+#         num_diff_distr_instances = 200,
 #         transfer_kappa_threshold = 0.2,
 #         bbt_pool_size = 50,
-#         gamma = 3.0
-#     )
-# noise_tree_0_0_gradual = \
-#     Param(
-#         exp_code= 'tree/noise-0.0-0.0',
-#         least_transfer_warning_period_instances_length = 300,
-#         num_diff_distr_instances = 300,
-#         transfer_kappa_threshold = 0.2,
-#         bbt_pool_size = 20,
-#         gamma = 2.0
+#         gamma = 8.0
 #     )
 # 
-# params = [noise_tree_0_0, noise_tree_1_0, noise_tree_2_1,
-#           noise_tree_0_0_gradual]
+# params = [noise_agrawal_0_0, noise_agrawal_2_1,
+#           noise_agrawal_0_0_gradual, noise_agrawal_2_1_gradual,
+#           noise_agrawal_2_1_case]
+
+####################################################################
+
+noise_tree_0_0 = \
+    Param(
+        exp_code= 'tree/noise-0.0-0.0',
+        least_transfer_warning_period_instances_length = 200,
+        num_diff_distr_instances = 100,
+        transfer_kappa_threshold = 0.3,
+        bbt_pool_size = 50,
+        gamma = 1.0
+    )
+
+noise_tree_1_0 = \
+    Param(
+        exp_code= 'tree/noise-0.1-0.0',
+        least_transfer_warning_period_instances_length = 300,
+        num_diff_distr_instances = 300,
+        transfer_kappa_threshold = 0.2,
+        bbt_pool_size = 10,
+        gamma = 10.0
+    )
+
+noise_tree_2_1 = \
+    Param(
+        exp_code= 'tree/noise-0.2-0.1',
+        least_transfer_warning_period_instances_length = 100,
+        num_diff_distr_instances = 300,
+        transfer_kappa_threshold = 0.2,
+        bbt_pool_size = 20,
+        gamma = 6.0
+    )
+
+noise_tree_0_0_gradual = \
+    Param(
+        exp_code= 'tree/noise-0.0-0.0',
+        least_transfer_warning_period_instances_length = 200,
+        num_diff_distr_instances = 100,
+        transfer_kappa_threshold = 0.2,
+        bbt_pool_size = 50,
+        gamma = 3.0
+    )
+noise_tree_0_0_gradual = \
+    Param(
+        exp_code= 'tree/noise-0.0-0.0',
+        least_transfer_warning_period_instances_length = 300,
+        num_diff_distr_instances = 300,
+        transfer_kappa_threshold = 0.2,
+        bbt_pool_size = 20,
+        gamma = 2.0
+    )
+
+params = [noise_tree_0_0, noise_tree_1_0, noise_tree_2_1,
+          noise_tree_0_0_gradual]
 
 def is_empty_file(fpath):
     return False if os.path.isfile(fpath) and os.path.getsize(fpath) > 0 else True
