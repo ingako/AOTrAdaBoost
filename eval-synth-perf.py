@@ -3,7 +3,6 @@
 import os
 import sys
 import math
-import statistics as stats
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
@@ -48,7 +47,41 @@ noise_agrawal_2_1 = \
         gamma = 4.0
     )
 
-params = [noise_agrawal_0_0, noise_agrawal_2_1]
+noise_agrawal_0_0_gradual = \
+    Param(
+        exp_code= 'noise-0.0-0.0-gradual',
+        least_transfer_warning_period_instances_length = 150,
+        num_diff_distr_instances = 300,
+        transfer_kappa_threshold = 0.2,
+        bbt_pool_size = 30,
+        gamma = 5.0
+    )
+
+# #TODO
+# noise_agrawal_1_0_gradual = \
+#     Param(
+#         exp_code= 'noise-0.1-0.0-gradual',
+#         least_transfer_warning_period_instances_length = 100,
+#         num_diff_distr_instances = 300,
+#         transfer_kappa_threshold = 0.4,
+#         bbt_pool_size = 40,
+#         gamma = 4.0
+#     )
+
+noise_agrawal_2_1_gradual = \
+    Param(
+        exp_code= 'noise-0.2-0.1-gradual',
+        least_transfer_warning_period_instances_length = 400,
+        num_diff_distr_instances = 200,
+        transfer_kappa_threshold = 0.2,
+        bbt_pool_size = 30,
+        gamma = 6.0
+    )
+
+params = [noise_agrawal_0_0, noise_agrawal_2_1,
+          noise_agrawal_0_0_gradual, noise_agrawal_2_1_gradual]
+
+####################################################################
 
 # noise_tree_0_0 = \
 #     Param(
@@ -69,21 +102,41 @@ params = [noise_agrawal_0_0, noise_agrawal_2_1]
 #         bbt_pool_size = 10,
 #         gamma = 10.0
 #     )
-# # noise_tree_1_0 = \
-# #     Param(
-# #         exp_code= 'tree/noise-0.1-0.0',
-# #         least_transfer_warning_period_instances_length = 100,
-# #         num_diff_distr_instances = 200,
-# #         transfer_kappa_threshold = 0.2,
-# #         bbt_pool_size = 10,
-# #         gamma = 8.0
-# #     )
 # 
-# params = [noise_tree_0_0, noise_tree_1_0]
+# noise_tree_2_1 = \
+#     Param(
+#         exp_code= 'tree/noise-0.2-0.1',
+#         least_transfer_warning_period_instances_length = 100,
+#         num_diff_distr_instances = 300,
+#         transfer_kappa_threshold = 0.2,
+#         bbt_pool_size = 20,
+#         gamma = 6.0
+#     )
+# 
+# noise_tree_0_0_gradual = \
+#     Param(
+#         exp_code= 'tree/noise-0.0-0.0',
+#         least_transfer_warning_period_instances_length = 200,
+#         num_diff_distr_instances = 100,
+#         transfer_kappa_threshold = 0.2,
+#         bbt_pool_size = 50,
+#         gamma = 3.0
+#     )
+# noise_tree_0_0_gradual = \
+#     Param(
+#         exp_code= 'tree/noise-0.0-0.0',
+#         least_transfer_warning_period_instances_length = 300,
+#         num_diff_distr_instances = 300,
+#         transfer_kappa_threshold = 0.2,
+#         bbt_pool_size = 20,
+#         gamma = 2.0
+#     )
+# 
+# params = [noise_tree_0_0, noise_tree_1_0, noise_tree_2_1,
+#           noise_tree_0_0_gradual]
 
 def is_empty_file(fpath):
     return False if os.path.isfile(fpath) and os.path.getsize(fpath) > 0 else True
-
 
 
 for p in params:
@@ -121,6 +174,7 @@ for p in params:
         acc_list = []
         kappa_list = []
         acc_gain_list = []
+        kappa_gain_list = []
         # acc_gain_per_drift_list = []
         time_list = []
 
@@ -135,45 +189,55 @@ for p in params:
 
             metrics = []
 
-            # acc_list.append(benchmark_df["accuracy"].mean())
-            # kappa_list.append(benchmark_df["kappa"].mean())
-            # time_list.append(benchmark_df["time"].iloc[-1]/60)
             acc_list.extend(benchmark_df["accuracy"].to_list())
             kappa_list.extend(benchmark_df["kappa"].to_list())
             time_list.append(benchmark_df["time"].iloc[-1])
 
             if boost_mode == "disable_transfer":
                 acc_gain_list.append(0)
+                kappa_gain_list.append(0)
                 # acc_gain_per_drift_list.append(0)
             else:
-                acc_gain_list.append(benchmark_df["accuracy"].sum() - disable_df["accuracy"].sum())
+
+                acc_gain = 0
+                for i in range(0, len(benchmark_df)):
+                    acc_gain += benchmark_df["accuracy"][i] - disable_df["accuracy"][i]
+                # acc_gain_list.append(benchmark_df["accuracy"].sum() - disable_df["accuracy"].sum())
+                acc_gain_list.append(acc_gain)
+
+                kappa_gain_list.append(benchmark_df["kappa"].sum() - disable_df["kappa"].sum())
                 # gain = 0
                 # for row in range(81, 90):
                 #     gain += benchmark_df["accuracy"].iloc[row] - disable_df["accuracy"].iloc[row]
                 # acc_gain_per_drift_list.append(gain)
 
-        acc = stats.mean(acc_list)
-        acc_std = stats.stdev(acc_list)
+        acc = np.mean(acc_list)
+        acc_std = np.std(acc_list)
         metrics.append(f"${acc:.2f}" + " \\pm " + f"{acc_std:.2f}$")
 
-        kappa = stats.mean(kappa_list)
-        kappa_std = stats.stdev(kappa_list)
+        kappa = np.mean(kappa_list)
+        kappa_std = np.std(kappa_list)
         metrics.append(f"${kappa:.2f}" + " \\pm " + f"{kappa_std:.2f}$")
 
         if boost_mode == "disable_transfer":
             metrics.append('-')
+            metrics.append('-')
         else:
-            # acc_gain_per_drift = stats.mean(acc_gain_per_drift_list)
-            # acc_gain_per_drift_std = stats.stdev(acc_gain_per_drift_list)
+            # acc_gain_per_drift = np.mean(acc_gain_per_drift_list)
+            # acc_gain_per_drift_std = np.std(acc_gain_per_drift_list)
             # metrics.append(f"${acc_gain_per_drift:.2f}" + " \\pm " + f"{acc_gain_per_drift_std:.2f}$")
 
-            acc_gain = stats.mean(acc_gain_list)
-            acc_gain_std = stats.stdev(acc_gain_list)
+            acc_gain = np.mean(acc_gain_list)
+            acc_gain_std = np.std(acc_gain_list)
             metrics.append(f"${acc_gain:.2f}" + " \\pm " + f"{acc_gain_std:.2f}$")
 
+            kappa_gain = np.mean(kappa_gain_list)
+            kappa_gain_std = np.std(kappa_gain_list)
+            metrics.append(f"${kappa_gain:.2f}" + " \\pm " + f"{kappa_gain_std:.2f}$")
 
-        time = stats.mean(time_list)
-        time_std = stats.stdev(time_list)
+
+        time = np.mean(time_list)
+        time_std = np.std(time_list)
         metrics.append(f"${time:.2f}$")
 
         print(" & ".join(metrics))
