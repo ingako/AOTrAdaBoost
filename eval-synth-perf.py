@@ -28,29 +28,58 @@ class Param:
     bbt_pool_size: int = 40
     gamma: float = 4
 
-
-noise_tree_0_0 = \
+noise_agrawal_0_0 = \
     Param(
-        exp_code= 'tree/noise-0.0-0.0',
-        least_transfer_warning_period_instances_length = 200,
-        num_diff_distr_instances = 100,
-        transfer_kappa_threshold = 0.3,
-        bbt_pool_size = 50,
-        gamma = 1.0
-    )
-
-noise_tree_1_0 = \
-    Param(
-        exp_code= 'tree/noise-0.1-0.0',
-        least_transfer_warning_period_instances_length = 300,
+        exp_code= 'noise-0.0-0.0',
+        least_transfer_warning_period_instances_length = 100,
         num_diff_distr_instances = 300,
-        transfer_kappa_threshold = 0.2,
-        bbt_pool_size = 10,
-        gamma = 10.0
+        transfer_kappa_threshold = 0.4,
+        bbt_pool_size = 40,
+        gamma = 4.0
     )
 
+noise_agrawal_2_1 = \
+    Param(
+        exp_code= 'noise-0.2-0.1',
+        least_transfer_warning_period_instances_length = 100,
+        num_diff_distr_instances = 300,
+        transfer_kappa_threshold = 0.3,
+        bbt_pool_size = 10,
+        gamma = 4.0
+    )
 
-params = [noise_tree_0_0, noise_tree_1_0]
+params = [noise_agrawal_0_0, noise_agrawal_2_1]
+
+# noise_tree_0_0 = \
+#     Param(
+#         exp_code= 'tree/noise-0.0-0.0',
+#         least_transfer_warning_period_instances_length = 200,
+#         num_diff_distr_instances = 100,
+#         transfer_kappa_threshold = 0.3,
+#         bbt_pool_size = 50,
+#         gamma = 1.0
+#     )
+# 
+# noise_tree_1_0 = \
+#     Param(
+#         exp_code= 'tree/noise-0.1-0.0',
+#         least_transfer_warning_period_instances_length = 300,
+#         num_diff_distr_instances = 300,
+#         transfer_kappa_threshold = 0.2,
+#         bbt_pool_size = 10,
+#         gamma = 10.0
+#     )
+# # noise_tree_1_0 = \
+# #     Param(
+# #         exp_code= 'tree/noise-0.1-0.0',
+# #         least_transfer_warning_period_instances_length = 100,
+# #         num_diff_distr_instances = 200,
+# #         transfer_kappa_threshold = 0.2,
+# #         bbt_pool_size = 10,
+# #         gamma = 8.0
+# #     )
+# 
+# params = [noise_tree_0_0, noise_tree_1_0]
 
 def is_empty_file(fpath):
     return False if os.path.isfile(fpath) and os.path.getsize(fpath) > 0 else True
@@ -91,8 +120,8 @@ for p in params:
 
         acc_list = []
         kappa_list = []
-        gain_per_drift = []
         acc_gain_list = []
+        # acc_gain_per_drift_list = []
         time_list = []
 
         for seed in range(10):
@@ -115,8 +144,13 @@ for p in params:
 
             if boost_mode == "disable_transfer":
                 acc_gain_list.append(0)
+                # acc_gain_per_drift_list.append(0)
             else:
                 acc_gain_list.append(benchmark_df["accuracy"].sum() - disable_df["accuracy"].sum())
+                # gain = 0
+                # for row in range(81, 90):
+                #     gain += benchmark_df["accuracy"].iloc[row] - disable_df["accuracy"].iloc[row]
+                # acc_gain_per_drift_list.append(gain)
 
         acc = stats.mean(acc_list)
         acc_std = stats.stdev(acc_list)
@@ -129,9 +163,14 @@ for p in params:
         if boost_mode == "disable_transfer":
             metrics.append('-')
         else:
+            # acc_gain_per_drift = stats.mean(acc_gain_per_drift_list)
+            # acc_gain_per_drift_std = stats.stdev(acc_gain_per_drift_list)
+            # metrics.append(f"${acc_gain_per_drift:.2f}" + " \\pm " + f"{acc_gain_per_drift_std:.2f}$")
+
             acc_gain = stats.mean(acc_gain_list)
             acc_gain_std = stats.stdev(acc_gain_list)
             metrics.append(f"${acc_gain:.2f}" + " \\pm " + f"{acc_gain_std:.2f}$")
+
 
         time = stats.mean(time_list)
         time_std = stats.stdev(time_list)
