@@ -38,7 +38,7 @@ def is_empty_file(fpath):
     return False if os.path.isfile(fpath) and os.path.getsize(fpath) > 0 else True
 
 
-def eval_sensitivity(p):
+def eval_sensitivity(p, v):
     for i in range(len(benchmark_list)):
         boost_mode = benchmark_list[i]
         path = f"{p.exp_code}/{benchmark_list[i]}"
@@ -126,45 +126,45 @@ def eval_sensitivity(p):
 
             acc_gain = np.mean(acc_gain_list) * 100
             acc_gain_std = np.std(acc_gain_list) * 100
-            metrics.append(f"${acc_gain:.2f}" + " \\pm " + f"{acc_gain_std:.2f}$")
+            metrics.append(f"${round(acc_gain)}$")
 
             kappa_gain = np.mean(kappa_gain_list) * 100
             kappa_gain_std = np.std(kappa_gain_list) * 100
-            metrics.append(f"${kappa_gain:.2f}" + " \\pm " + f"{kappa_gain_std:.2f}$")
+            metrics.append(f"${round(kappa_gain)}$")
 
 
         time = np.mean(time_list)
         time_std = np.std(time_list)
         metrics.append(f"${time:.2f}" + " \\pm " + f"{time:.2f}$")
 
-        print(" & ".join(metrics) + "\\\\")
+        print(f"{v} & "+ " & ".join(metrics) + "\\\\")
 
 print("least")
 for v in [100, 200, 300, 400]:
     params = copy.deepcopy(noise_agrawal_2_1)
     params.least_transfer_warning_period_instances_length = v
-    eval_sensitivity(params)
+    eval_sensitivity(params, v)
 
 print("num_instances")
 for v in [100, 200, 300]:
     params = copy.deepcopy(noise_agrawal_2_1)
     params.num_diff_distr_instances = v
-    eval_sensitivity(params)
+    eval_sensitivity(params, v)
 
 print("kappa")
 for v in [0.0, 0.1, 0.2, 0.3, 0.4]:
     params = copy.deepcopy(noise_agrawal_2_1)
     params.transfer_kappa_threshold = v
-    eval_sensitivity(params)
+    eval_sensitivity(params, v)
 
 print("pool size")
 for v in [10, 20, 30, 40, 50]:
     params = copy.deepcopy(noise_agrawal_2_1)
     params.bbt_pool_size = v
-    eval_sensitivity(params)
+    eval_sensitivity(params, v)
 
 print("gamma")
 for v in [2.0, 4.0, 6.0, 8.0]:
     params = copy.deepcopy(noise_agrawal_2_1)
     params.gamma = v
-    eval_sensitivity(params)
+    eval_sensitivity(params, v)
