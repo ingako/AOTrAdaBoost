@@ -27,6 +27,18 @@ class Param:
     bbt_pool_size: int = 40
     gamma: float = 4
 
+
+tree_case = \
+    Param(
+        exp_code= 'tree/case',
+        least_transfer_warning_period_instances_length = 200,
+        num_diff_distr_instances = 100,
+        transfer_kappa_threshold = 0.3,
+        bbt_pool_size = 40,
+        gamma = 8.0
+    )
+params = [tree_case]
+
 noise_agrawal_0_0 = \
     Param(
         exp_code= 'noise-0.0-0.0',
@@ -144,8 +156,8 @@ noise_agrawal_1_2_gradual = \
 #           ]
 
 # reverse noise transfer
-params = [noise_agrawal_0_1, noise_agrawal_1_2,
-          noise_agrawal_0_1_gradual, noise_agrawal_1_2_gradual]
+# params = [noise_agrawal_0_1, noise_agrawal_1_2,
+#           noise_agrawal_0_1_gradual, noise_agrawal_1_2_gradual]
 
 ####################################################################
 
@@ -256,8 +268,8 @@ noise_tree_1_2_gradual = \
         gamma = 7.0
     )
 
-params = [noise_tree_0_1, noise_tree_1_2,
-          noise_tree_0_1_gradual, noise_tree_1_2_gradual]
+# params = [noise_tree_0_1, noise_tree_1_2,
+#           noise_tree_0_1_gradual, noise_tree_1_2_gradual]
 
 
 
