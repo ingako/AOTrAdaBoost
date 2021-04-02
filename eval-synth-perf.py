@@ -57,6 +57,7 @@ noise_agrawal_2_1 = \
         gamma = 4.0
     )
 
+
 noise_agrawal_0_0_gradual = \
     Param(
         exp_code= 'noise-0.0-0.0-gradual',
@@ -97,9 +98,54 @@ noise_agrawal_2_1_gradual = \
 #         gamma = 8.0
 #     )
 
-params = [noise_agrawal_0_0, noise_agrawal_1_0, noise_agrawal_2_1,
-          noise_agrawal_0_0_gradual, noise_agrawal_1_0_gradual, noise_agrawal_2_1_gradual,
-          ]
+noise_agrawal_0_1 = \
+    Param(
+        exp_code= 'noise-0.0-0.1',
+        least_transfer_warning_period_instances_length = 100,
+        num_diff_distr_instances = 300,
+        transfer_kappa_threshold = 0.3,
+        bbt_pool_size = 50,
+        gamma = 9.0
+    )
+
+noise_agrawal_1_2 = \
+    Param(
+        exp_code= 'noise-0.1-0.2',
+        least_transfer_warning_period_instances_length = 100,
+        num_diff_distr_instances = 300,
+        transfer_kappa_threshold = 0.4,
+        bbt_pool_size = 20,
+        gamma = 6.0
+    )
+
+noise_agrawal_0_1_gradual = \
+    Param(
+        exp_code= 'noise-0.0-0.1-gradual',
+        least_transfer_warning_period_instances_length = 100,
+        num_diff_distr_instances = 200,
+        transfer_kappa_threshold = 0.4,
+        bbt_pool_size = 50,
+        gamma = 5.0
+    )
+
+noise_agrawal_1_2_gradual = \
+    Param(
+        exp_code= 'noise-0.1-0.2-gradual',
+        least_transfer_warning_period_instances_length = 100,
+        num_diff_distr_instances = 300,
+        transfer_kappa_threshold = 0.2,
+        bbt_pool_size = 40,
+        gamma = 7.0
+    )
+
+
+# params = [noise_agrawal_0_0, noise_agrawal_1_0, noise_agrawal_2_1,
+#           noise_agrawal_0_0_gradual, noise_agrawal_1_0_gradual, noise_agrawal_2_1_gradual,
+#           ]
+
+# reverse noise transfer
+params = [noise_agrawal_0_1, noise_agrawal_1_2,
+          noise_agrawal_0_1_gradual, noise_agrawal_1_2_gradual]
 
 ####################################################################
 
@@ -168,6 +214,54 @@ params = [noise_agrawal_0_0, noise_agrawal_1_0, noise_agrawal_2_1,
 #           noise_tree_0_0_gradual, noise_tree_1_0_gradual, noise_tree_2_1_gradual]
 # 
 # ####################################################################
+# tree reverse noise
+
+noise_tree_0_1 = \
+    Param(
+        exp_code= 'tree/noise-0.0-0.1',
+        least_transfer_warning_period_instances_length = 100,
+        num_diff_distr_instances = 300,
+        transfer_kappa_threshold = 0.4,
+        bbt_pool_size = 40,
+        gamma = 10.0
+    )
+
+noise_tree_1_2 = \
+    Param(
+        exp_code= 'tree/noise-0.1-0.2',
+        least_transfer_warning_period_instances_length = 300,
+        num_diff_distr_instances = 300,
+        transfer_kappa_threshold = 0.2,
+        bbt_pool_size = 30,
+        gamma = 8.0
+    )
+
+noise_tree_0_1_gradual = \
+    Param(
+        exp_code= 'tree/noise-0.0-0.1-gradual',
+        least_transfer_warning_period_instances_length = 100,
+        num_diff_distr_instances = 200,
+        transfer_kappa_threshold = 0.2,
+        bbt_pool_size = 40,
+        gamma = 1.0
+    )
+
+noise_tree_1_2_gradual = \
+    Param(
+        exp_code= 'tree/noise-0.1-0.2-gradual',
+        least_transfer_warning_period_instances_length = 300,
+        num_diff_distr_instances = 300,
+        transfer_kappa_threshold = 0.2,
+        bbt_pool_size = 20,
+        gamma = 7.0
+    )
+
+params = [noise_tree_0_1, noise_tree_1_2,
+          noise_tree_0_1_gradual, noise_tree_1_2_gradual]
+
+
+
+# ####################################################################
 # partial
 # 
 # partial_agrawal_70_109 = \
@@ -218,52 +312,48 @@ params = [noise_agrawal_0_0, noise_agrawal_1_0, noise_agrawal_2_1,
 ####################################################################
 # partial tree
 
-# TODO
-partial_tree_73_84 = \
-    Param(
-        exp_code= 'tree/partial-73-84',
-        least_transfer_warning_period_instances_length = 100,
-        num_diff_distr_instances = 300,
-        transfer_kappa_threshold = 0.2,
-        bbt_pool_size = 50,
-        gamma = 2.0
-    )
-
-# TODO
-partial_tree_84_73 = \
-    Param(
-        exp_code= 'tree/partial-84-73',
-        least_transfer_warning_period_instances_length = 100,
-        num_diff_distr_instances = 200,
-        transfer_kappa_threshold = 0.1,
-        bbt_pool_size = 50,
-        gamma = 1.0
-    )
-
-# TODO
-partial_tree_73_84_gradual = \
-    Param(
-        exp_code= 'tree/partial-73-84-gradual',
-        least_transfer_warning_period_instances_length = 100,
-        num_diff_distr_instances = 300,
-        transfer_kappa_threshold = 0.2,
-        bbt_pool_size = 50,
-        gamma = 2.0
-    )
-
-# TODO
-partial_tree_84_73_gradual = \
-    Param(
-        exp_code= 'tree/partial-84-73-gradual',
-        least_transfer_warning_period_instances_length = 100,
-        num_diff_distr_instances = 200,
-        transfer_kappa_threshold = 0.1,
-        bbt_pool_size = 50,
-        gamma = 1.0
-    )
-
-params = [partial_tree_73_84, partial_tree_84_73,
-          partial_tree_73_84_gradual, partial_84_73_gradual]
+# partial_tree_73_84 = \
+#     Param(
+#         exp_code= 'tree/partial-73-84',
+#         least_transfer_warning_period_instances_length = 200,
+#         num_diff_distr_instances = 100,
+#         transfer_kappa_threshold = 0.3,
+#         bbt_pool_size = 50,
+#         gamma = 1.0
+#     )
+# 
+# partial_tree_84_73 = \
+#     Param(
+#         exp_code= 'tree/partial-84-73',
+#         least_transfer_warning_period_instances_length = 200,
+#         num_diff_distr_instances = 100,
+#         transfer_kappa_threshold = 0.3,
+#         bbt_pool_size = 50,
+#         gamma = 1.0
+#     )
+# 
+# partial_tree_73_84_gradual = \
+#     Param(
+#         exp_code= 'tree/partial-73-84-gradual',
+#         least_transfer_warning_period_instances_length = 200,
+#         num_diff_distr_instances = 100,
+#         transfer_kappa_threshold = 0.2,
+#         bbt_pool_size = 50,
+#         gamma = 3.0
+#     )
+# 
+# # TODO
+# partial_tree_84_73_gradual = \
+#     Param(
+#         exp_code= 'tree/partial-84-73-gradual',
+#         least_transfer_warning_period_instances_length = 100,
+#         num_diff_distr_instances = 200,
+#         transfer_kappa_threshold = 0.1,
+#         bbt_pool_size = 50,
+#         gamma = 1.0
+#     )
+# 
+# params = [partial_tree_73_84, partial_tree_73_84_gradual]
 
 def is_empty_file(fpath):
     return False if os.path.isfile(fpath) and os.path.getsize(fpath) > 0 else True
