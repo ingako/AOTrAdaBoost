@@ -637,7 +637,7 @@ trans_pearl_tree::trans_pearl_tree(int tree_pool_id,
                      mrand),
          instance_store_size(instance_store_size) {}
 
-trans_pearl_tree::trans_pearl_tree(trans_pearl_tree const &rhs)
+trans_pearl_tree::trans_pearl_tree(trans_pearl_tree &rhs)
         : pearl_tree(rhs.tree_pool_id,
                      rhs.kappa_window_size,
                      rhs.warning_delta,

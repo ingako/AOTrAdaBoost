@@ -159,7 +159,7 @@ public:
                      std::mt19937 mrand,
                      int instance_store_size);
 
-    trans_pearl_tree(trans_pearl_tree const &rhs);
+    trans_pearl_tree(trans_pearl_tree &rhs);
 
     // 1. For matching a concept by running other trees in other domains on it
     // 2. For generating data by using KNN
